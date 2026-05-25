@@ -3,7 +3,14 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("**Weather App**")
+st.set_page_config(
+    page_title="Swastik GeoWeather - Live Weather App",
+    page_icon="⚡",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+st.title("**Geo Weather App-Py**")
 st.write("**Enter a city name to get the current temperature with longitude and latitude and weather conditions.**")
 input_city = st.text_input("**Enter a city name to get the current temperature:**")
 
@@ -43,6 +50,26 @@ def longitude_latitude(city_name):
 
         st.warning("City not found. Please enter a valid city name.")
         return None, None
+
+
+
+@st.cache_data(ttl=3600)
+def longitude_latitude(city_name):
+    geolocator = Nominatim(user_agent="geoapp")
+    
+    # Try fetching the location safely
+    try:
+        location = geolocator.geocode(city_name)
+        if location:
+            latitude = location.latitude
+            longitude =location.longitude
+            return latitude, longitude
+        else:
+            st.error("🔍 City not found. Please enter a valid city name.")
+            st.stop()  # 🛑 Halts the script right here so it never hits the API!
+    except Exception:
+        st.error("🌐 Geocoding service is temporarily busy. Please try again in a moment.")
+        st.stop()
     
 
 
@@ -66,18 +93,16 @@ def get_weather(latitude, longitude):
         st.metric(label="**Weather Condition**", value=get_weather_desc(data['current']['weathercode']))
     
 
-    st.write(f"**Coordinates:** Latitude {latitude}, Longitude {longitude}")
+    st.write(f"**Coordinates:** Latitude {latitude:.2f}, Longitude {longitude:.2f}")
     st.write("**This Website is Made by Swatik Pandey**")
    
     
     # --- ADDING THE GOOGLE MAPS SATELLITE VIEW ---
+    # 3. Display Google Maps Satellite View
     st.markdown("### 🛰️ **Satellite View**")
     
-    # Create the Google Maps Embed URL using the latitude and longitude
-    # 't=k' sets the map type to Satellite/Terrain mode
-    google_maps_url = f"https://maps.google.com/maps?q={latitude},{longitude}&t=k&z=12&output=embed"
-    
-    # Embed it cleanly using HTML components
+    # Using the universal standard query structure for keyless iframe embeds
+    google_maps_url = f"https://maps.google.com/maps?q={latitude},{longitude}&t=k&z=14&output=embed"
     
     components.html(
         f'<iframe src="{google_maps_url}" width="100%" height="400" style="border:0; border-radius:10px;" allowfullscreen="" loading="lazy"></iframe>',
