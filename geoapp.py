@@ -12,6 +12,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# 🔑 Your active OpenWeatherMap API key injected safely
+API_KEY = "187020f5dd44511bea738e0bac59896d"
+
 st.title("**Geo Weather App-Py**")
 st.write("**Enter a city name to get the current temperature with longitude and latitude and weather conditions.**")
 
@@ -19,50 +22,10 @@ input_city = st.text_input("**Enter a city name to get the current temperature:*
 button = st.button("**Get Weather**")
 
 
-def get_weather_desc(code, is_day=1):
-    """Translates Open-Meteo WMO weather codes into readable descriptions with day/night awareness."""
-    codes = {
-        0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
-        45: "Foggy", 48: "Depositing rime fog",
-        51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
-        61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain Status",
-        71: "Slight snow", 73: "Moderate snow", 75: "Heavy snow",
-        80: "Slight rain showers", 81: "Moderate rain showers", 82: "Violent rain showers",
-        95: "Thunderstorm", 96: "Thunderstorm with slight hail", 99: "Thunderstorm with heavy hail"
-    }
-    
-    desc = codes.get(code, f"Unknown Code ({code})")
-    
-    # Contextual Day/Night strings for current weather status block
-    if is_day == 0:  # Nighttime
-        if code == 0: return "Clear Night 🌙"
-        if code == 1: return "Mainly Clear Night 🌌"
-        return f"{desc} ☁️"
-    else:  # Daytime
-        if code == 0: return "Clear sky ☀️"
-        if code == 1: return "Mainly clear 🌤️"
-        if code == 2: return "Partly cloudy ⛅"
-        return f"{desc} ☀️"
-
-
-def get_forecast_emoji(code):
-    """Direct dictionary mapping for forecast cards to prevent string-slicing and alignment errors."""
-    emoji_map = {
-        0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
-        45: "🌫️", 48: "🌫️",
-        51: "🌧️", 53: "🌧️", 55: "🌧️",
-        61: "🌧️", 63: "🌧️", 65: "🌧️",
-        71: "❄️", 73: "❄️", 75: "❄️",
-        80: "🌦️", 81: "🌦️", 82: "⛈️",
-        95: "🌩️", 96: "⛈️", 99: "⛈️"
-    }
-    return emoji_map.get(code, "🌡️")
-
-
 @st.cache_data(ttl=3600)
 def longitude_latitude(city_name):
     """Safely geocodes a location name to dynamic coordinates with integrated caching."""
-    geolocator = Nominatim(user_agent="geoapp")
+    geolocator = Nominatim(user_agent="geoapp_swastik_weather")
     try:
         location = geolocator.geocode(city_name)
         if location:
@@ -75,57 +38,109 @@ def longitude_latitude(city_name):
         st.stop()
 
 
-def get_weather(latitude, longitude):
-    """Queries the weather payload engine and paints all elements to the web page UI."""
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weathercode,windspeed_10m,relative_humidity_2m,is_day&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto"
+def get_weather_data(lat, lon):
+    """Fetches real-time current weather data using the Standard Free API endpoint."""
+    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&units=metric&appid={API_KEY}"
+    try:
+        response = requests.get(url)
+        if response.status_code != 200:
+            st.error(f"❌ Current Weather API Error: {response.json().get('message', 'Unknown Error')}")
+            st.stop()
+        return response.json()
+    except Exception:
+        st.error("⚡ Unable to connect to OpenWeatherMap.")
+        st.stop()
 
-    response = requests.get(url)
-    data = response.json()
+
+def get_forecast_data(lat, lon):
+    """Fetches 5-day / 3-hour forecast data using the Standard Free API endpoint."""
+    url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=metric&appid={API_KEY}"
+    try:
+        response = requests.get(url)
+        if response.status_code != 200:
+            st.error(f"❌ Forecast API Error: {response.json().get('message', 'Unknown Error')}")
+            st.stop()
+        return response.json()
+    except Exception:
+        st.error("⚡ Unable to fetch forecast array elements.")
+        st.stop()
+
+
+def render_weather_dashboard(current_data, forecast_data, lat, lon):
+    """Paints all processed weather variables and UI frameworks onto the webpage."""
     
-    current_data = data['current']
-    is_day = current_data.get('is_day', 1)
+    # --- 1. CURRENT WEATHER SECTION ---
+    weather_info = current_data['weather'][0]
+    temp = current_data['main']['temp']
+    wind_speed = current_data['wind']['speed'] * 3.6  # Convert m/s to km/h
+    humidity = current_data['main']['humidity']
+    condition_desc = weather_info['description'].title()
+    icon_id = weather_info['icon']
     
-    # 1. Display Current Weather Metrics
     st.subheader(f"**Weather Information for {input_city.title()}:**")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric(label="Temperature (°C)", value=f"{current_data['temperature_2m']} °C")
-        st.metric(label="Wind Speed (km/h)", value=f"{current_data['windspeed_10m']} km/h")
+        st.metric(label="Temperature (°C)", value=f"{temp:.1f} °C")
+        st.metric(label="Wind Speed (km/h)", value=f"{wind_speed:.1f} km/h")
         
     with col2:
-        st.metric(label="Relative Humidity (%)", value=f"{current_data['relative_humidity_2m']} %")
-        st.metric(label="Weather Condition", value=get_weather_desc(current_data['weathercode'], is_day))
+        st.metric(label="Relative Humidity (%)", value=f"{humidity} %")
+        icon_url = f"http://openweathermap.org/img/wn/{icon_id}@2x.png"
+        st.markdown(
+            f"**Weather Condition:** {condition_desc} <img src='{icon_url}' width='45' style='vertical-align:middle;'>", 
+            unsafe_allow_html=True
+        )
     
-    st.write(f"**Coordinates:** Latitude {latitude:.2f}, Longitude {longitude:.2f}")
+    st.write(f"**Coordinates:** Latitude {lat:.2f}, Longitude {lon:.2f}")
     st.write("**This Website is Made by Swatik Pandey**")
     
-    # 2. Display 7-Day Forecast Grid
-    st.markdown("### 📅 **7-Day Forecast**")
-    daily_data = data['daily']
-    dates = daily_data['time']
-    max_temps = daily_data['temperature_2m_max']
-    min_temps = daily_data['temperature_2m_min']
-    weather_codes = daily_data['weathercode']
+    # --- 2. 5-DAY FORECAST PROCESSING ENGINE ---
+    st.markdown("### 📅 **5-Day Forecast**")
     
-    forecast_cols = st.columns(7)
-    for i in range(7):
+    # OpenWeatherMap provides data every 3 hours. We pick one mid-day snapshot (e.g., 12:00 PM) for each day.
+    forecast_list = forecast_data['list']
+    daily_snapshots = []
+    seen_dates = set()
+    
+    for item in forecast_list:
+        dt_obj = datetime.datetime.fromtimestamp(item['dt'])
+        date_str = dt_obj.strftime("%Y-%m-%d")
+        
+        # Grab a snapshot once per unique calendar day
+        if date_str not in seen_dates:
+            # We skip today's date if it's already running in the "Current Weather" box above
+            if date_str != datetime.datetime.now().strftime("%Y-%m-%d"):
+                daily_snapshots.append(item)
+                seen_dates.add(date_str)
+        
+        # Limit to 5 clean forecast columns max
+        if len(daily_snapshots) == 5:
+            break
+
+    # Render columns responsively
+    forecast_cols = st.columns(5)
+    for i, day in enumerate(daily_snapshots):
         with forecast_cols[i]:
-            date_obj = datetime.datetime.strptime(dates[i], "%Y-%m-%d")
+            date_obj = datetime.datetime.fromtimestamp(day['dt'])
             day_name = date_obj.strftime("%a")
             day_date = date_obj.strftime("%b %d")
             
-            # 🔥 Bulletproof emoji injection via direct mapping function
-            emoji = get_forecast_emoji(weather_codes[i])
+            day_icon = day['weather'][0]['icon']
+            day_icon_url = f"http://openweathermap.org/img/wn/{day_icon}.png"
+            
+            # The 5-day tier provides the expected atmospheric temperatures cleanly
+            max_temp = day['main']['temp_max']
+            min_temp = day['main']['temp_min']
             
             st.markdown(f"**{day_name}**")
             st.caption(day_date)
-            st.markdown(f"### {emoji}")
-            st.markdown(f"🔥**{int(max_temps[i])}°**")
-            st.markdown(f"❄️**{int(min_temps[i])}°**")
+            st.markdown(f"<img src='{day_icon_url}' width='45'>", unsafe_allow_html=True)
+            st.markdown(f"🔥**{int(max_temp)}°**")
+            st.markdown(f"❄️**{int(min_temp)}°**")
             
-    # 3. Display Secure Universal Google Maps Satellite Embed
+    # --- 3. GOOGLE MAPS SATELLITE EMBED ---
     st.markdown("### 🛰️ **Satellite View**")
-    google_maps_url = f"https://maps.google.com/maps?q={latitude},{longitude}&t=k&z=14&output=embed"
+    google_maps_url = f"https://maps.google.com/maps?q={lat},{lon}&t=k&z=14&output=embed"
     
     components.html(
         f'<iframe src="{google_maps_url}" width="100%" height="400" style="border:0; border-radius:10px;" allowfullscreen="" loading="lazy"></iframe>',
@@ -140,4 +155,8 @@ if button:
     else:
         lat, lon = longitude_latitude(input_city)
         if lat is not None and lon is not None:
-            get_weather(lat, lon)
+            # Dual fetch strategy bypassing any credit card requirement limitations
+            current_payload = get_weather_data(lat, lon)
+            forecast_payload = get_forecast_data(lat, lon)
+            
+            render_weather_dashboard(current_payload, forecast_payload, lat, lon)
