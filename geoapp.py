@@ -21,7 +21,6 @@ button = st.button("**Get Weather**")
 
 def get_weather_desc(code, is_day=1):
     """Translates Open-Meteo WMO weather codes into readable descriptions with day/night awareness."""
-    # Base description dictionary
     codes = {
         0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
         45: "Foggy", 48: "Depositing rime fog",
@@ -34,22 +33,30 @@ def get_weather_desc(code, is_day=1):
     
     desc = codes.get(code, f"Unknown Code ({code})")
     
-    # Contextual Day/Night Emojis
-    if is_day == 0:  # It's nighttime!
+    # Contextual Day/Night strings for current weather status block
+    if is_day == 0:  # Nighttime
         if code == 0: return "Clear Night 🌙"
         if code == 1: return "Mainly Clear Night 🌌"
-        if code in [2, 3]: return f"{desc} ☁️"
-        if code in [45, 48]: return f"{desc} 🌫 `"
-        if code in [51, 53, 55, 61, 63, 65, 80, 81]: return f"{desc} 🌧 ️"
-        return f"{desc} ⏰"
-    else:  # It's daytime!
+        return f"{desc} ☁️"
+    else:  # Daytime
         if code == 0: return "Clear sky ☀️"
         if code == 1: return "Mainly clear 🌤️"
         if code == 2: return "Partly cloudy ⛅"
-        if code == 3: return "Overcast ☁️"
-        if code in [45, 48]: return f"{desc} 🌫 ️"
-        if code in [51, 53, 55, 61, 63, 65, 80, 81]: return f"{desc} 🌧 ️"
         return f"{desc} ☀️"
+
+
+def get_forecast_emoji(code):
+    """Direct dictionary mapping for forecast cards to prevent string-slicing and alignment errors."""
+    emoji_map = {
+        0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
+        45: "🌫️", 48: "🌫️",
+        51: "🌧️", 53: "🌧️", 55: "🌧️",
+        61: "🌧️", 63: "🌧️", 65: "🌧️",
+        71: "❄️", 73: "❄️", 75: "❄️",
+        80: "🌦️", 81: "🌦️", 82: "⛈️",
+        95: "🌩️", 96: "⛈️", 99: "⛈️"
+    }
+    return emoji_map.get(code, "🌡️")
 
 
 @st.cache_data(ttl=3600)
@@ -70,14 +77,13 @@ def longitude_latitude(city_name):
 
 def get_weather(latitude, longitude):
     """Queries the weather payload engine and paints all elements to the web page UI."""
-    # Unified API call requesting current parameters, is_day tracker, and 7-day daily arrays
     url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weathercode,windspeed_10m,relative_humidity_2m,is_day&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto"
 
     response = requests.get(url)
     data = response.json()
     
     current_data = data['current']
-    is_day = current_data.get('is_day', 1)  # Reads 1 for daytime, 0 for nighttime
+    is_day = current_data.get('is_day', 1)
     
     # 1. Display Current Weather Metrics
     st.subheader(f"**Weather Information for {input_city.title()}:**")
@@ -108,9 +114,8 @@ def get_weather(latitude, longitude):
             day_name = date_obj.strftime("%a")
             day_date = date_obj.strftime("%b %d")
             
-            # Use daytime defaults (is_day=1) for general future forecast icons
-            condition_desc = get_weather_desc(weather_codes[i], is_day=1)
-            emoji = condition_desc[-1] if len(condition_desc) > 0 else "🌡️"
+            # 🔥 Bulletproof emoji injection via direct mapping function
+            emoji = get_forecast_emoji(weather_codes[i])
             
             st.markdown(f"**{day_name}**")
             st.caption(day_date)
