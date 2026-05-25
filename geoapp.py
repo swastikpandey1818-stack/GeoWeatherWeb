@@ -110,7 +110,7 @@ def get_weather(latitude, longitude):
             
             # Use daytime defaults (is_day=1) for general future forecast icons
             condition_desc = get_weather_desc(weather_codes[i], is_day=1)
-            emoji = condition_desc.split()[-1] if len(condition_desc.split()) > 0 else "🌡️"
+            emoji = condition_desc[-1] if len(condition_desc) > 0 else "🌡️"
             
             st.markdown(f"**{day_name}**")
             st.caption(day_date)
