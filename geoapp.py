@@ -145,7 +145,8 @@ with tab1:
     search_button = st.button("Get Live Metrics")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    
+    if 'selected_city' not in st.session_state:
+     st.session_state.selected_city = None
     if search_button and city_input:
         st.session_state.current_city = city_input
         fetch_weather_data(city_input)
@@ -164,51 +165,67 @@ with tab1:
     st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
 
 # ==========================================
-# 🔮 TAB 2: 7-DAY FORECAST WITH EMOJIS
-# ==========================================
-# ==========================================
-# 🔮 TAB 2: 7-DAY FORECAST (STABILIZED)
+# 🔮 TAB 2: PREMIUM FORECAST & INFOGRAPHICS
 # ==========================================
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
-    st.markdown("---")
-
-    # 1. The "State Gate": Only attempt to render if we have data
+    
+    # Ensure data exists before rendering
     if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
-        try:
-            daily = st.session_state.w_data["daily"]
-            dates = pd.to_datetime(daily["time"])
-            forecast_entries = []
+        daily = st.session_state.w_data["daily"]
+        dates = pd.to_datetime(daily["time"])
+        
+        st.write(f"Displaying meteorological outlook for: **{st.session_state.display_city}**")
+        
+        # 1. 7-DAY CREATIVE CARDS
+        st.markdown("### 🗓️ Weekly Trend")
+        cols = st.columns(7)
+        for i, col in enumerate(cols):
+            code = daily["weathercode"][i]
+            # Creative Emoji logic
+            if code in [0, 1]: emoji = "☀️"
+            elif code in [2, 3]: emoji = "☁️"
+            elif code in [45, 48]: emoji = "🌫️"
+            elif code in [51, 65]: emoji = "🌧️"
+            elif code in [71, 75]: emoji = "❄️"
+            else: emoji = "🌤️"
             
-            for i in range(len(dates)):
-                code = daily["weathercode"][i]
-                if code in [0, 1]: emoji = "☀️ Sunny"
-                elif code in [2, 3]: emoji = "☁️ Partly Cloudy"
-                elif code in [45, 48]: emoji = "🌫️ Foggy"
-                elif code in [51, 53, 55, 61, 63, 65]: emoji = "🌧️ Rainy"
-                elif code in [71, 73, 75]: emoji = "❄️ Snowy"
-                elif code in [95, 96, 99]: emoji = "⚡ Thunderstorm"
-                else: emoji = "🌤️ Variable"
-                
-                forecast_entries.append({
-                    "📅 Day / Date": dates[i].strftime('%A (%b %d)'),
-                    "📊 Condition": emoji,
-                    "🔺 Max Temp": f"{daily['temperature_2m_max'][i]}°C",
-                    "🔻 Min Temp": f"{daily['temperature_2m_min'][i]}°C"
-                })
-            
-            st.markdown('<div class="weather-card">', unsafe_allow_html=True)
-            st.table(pd.DataFrame(forecast_entries).set_index("📅 Day / Date"))
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-        except Exception as e:
-            st.error(f"Render Error: {e}")
-            
-    # 2. If data is missing, offer a clear path to fetch it
+            with col:
+                st.markdown(f"""
+                    <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; text-align:center;">
+                        <small>{dates[i].strftime('%a')}</small><br>
+                        <span style="font-size:1.5rem;">{emoji}</span><br>
+                        <strong>{daily['temperature_2m_max'][i]}°</strong><br>
+                        <small style="color:#888;">{daily['temperature_2m_min'][i]}°</small>
+                    </div>
+                """, unsafe_allow_html=True)
+
+        # 2. ATMOSPHERIC INFOGRAPHIC TABLE
+        st.markdown("### 📊 Atmospheric Summary Table")
+        infographic_data = pd.DataFrame({
+            "Day": dates.strftime('%A (%b %d)'),
+            "Max Temp (°C)": daily["temperature_2m_max"],
+            "Min Temp (°C)": daily["temperature_2m_min"],
+            "Condition Code": daily["weathercode"]
+        })
+        
+        # Styling the table with Streamlit's dataframe styling
+        st.dataframe(
+            infographic_data.set_index("Day"),
+            use_container_width=True,
+            column_config={
+                "Max Temp (°C)": st.column_config.NumberColumn(format="%d°C"),
+                "Min Temp (°C)": st.column_config.NumberColumn(format="%d°C")
+            }
+        )
+        
     else:
-        st.warning("Forecast data not ready.")
-        if st.button("Manual Refresh Forecast"):
-            fetch_weather_data(st.session_state.display_city.split(',')[0])
+        st.info("🔍 Please select a location in the 'Live Weather Metrics' tab to generate your forecast.")
+        
+        # Fallback manual search input for convenience
+        local_city = st.text_input("Or enter city directly here:", key="tab2_fallback")
+        if st.button("Generate Forecast"):
+            fetch_weather_data(local_city)
             st.rerun()
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
