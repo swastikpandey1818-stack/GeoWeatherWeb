@@ -7,9 +7,33 @@ import time
 import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
 # Initialize geolocator
+
+
 geolocator = Nominatim(user_agent="geoweather_app")
 if "w_data" not in st.session_state:
     st.session_state.w_data = None
+
+def init_app_state():
+    defaults = {
+        "w_data": None,
+        "temp_val": "--",       # Changed from "0°C" to indicate no data
+        "hum_val": "--",
+        "wind_val": "--",
+        "display_city": "Please search for a city",
+        "lat": None,
+        "lon": None,
+        "chat_history": []
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+
+if "temp_val" not in st.session_state:
+    st.session_state.temp_val = "0°C"  # Or your desired default
+
+
 def render_custom_bar_chart():
     categories = ['Coffee', 'Tea', 'Juice', 'Soft Drink', 'Plant-based']
     values = [100, 60, 70, 30, 40]
@@ -188,9 +212,6 @@ def fetch_weather_data(city_name_query):
     except Exception as exc:
         st.session_state.fetch_error = f"Weather fetch failed: {exc}"
 
-# Bootstrapping: If the app just opened up, run an initial background fetch for Gorakhpur right away
-if st.session_state.w_data is None:
-    fetch_weather_data("Gorakhpur")
 
 # Create the 3-Tab navigation layout
 tab1, tab2, tab3 = st.tabs(["📊 Live Weather Metrics", "🔮 7-Day Extended Forecast", "💬 Ask GeoWeather AI"])
@@ -222,11 +243,18 @@ with tab1:
     m_col1, m_col2, m_col3 = st.columns(3)
     
     with m_col1:
-        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>🌡️</h2><p style="color:#888;">Temperature</p><h2>{st.session_state.temp_val}</h2></div>', unsafe_allow_html=True)
+    # This will now display "--" instead of "0°C" if no search has been performed
+    st.markdown(f'''
+        <div class="weather-card" style="text-align: center;">
+            <h2>🌡️</h2>
+            <p style="color:#888;">Temperature</p>
+            <h2>{st.session_state.get("temp_val", "--")}</h2>
+        </div>
+    ''', unsafe_allow_html=True)
     with m_col2:
-        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💧</h2><p style="color:#888;">Humidity</p><h2>{st.session_state.hum_val}</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💧</h2><p style="color:#888;">Humidity</p><h2>{st.session_state.get("hum_val", "--")}</h2></div>', unsafe_allow_html=True)
     with m_col3:
-        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💨</h2><p style="color:#888;">Wind Velocity</p><h2>{st.session_state.wind_val}</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💨</h2><p style="color:#888;">Wind Velocity</p><h2>{st.session_state.get("wind_val", "--")}</h2></div>', unsafe_allow_html=True)
 
     st.markdown('### 🗺️ Geospatial Vector View')
     st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
