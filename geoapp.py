@@ -168,7 +168,7 @@ with tab1:
 # 🔮 TAB 2: PREMIUM FORECAST & INFOGRAPHICS
 # ==========================================
 
-st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
+
 
 def render_forecast_display():
     # Renders the creative cards and table if data exists
@@ -195,6 +195,7 @@ def render_forecast_display():
       df = pd.DataFrame({"Day": dates.strftime('%A'), "Max": daily["temperature_2m_max"], "Min": daily["temperature_2m_min"]})
       st.dataframe(df.set_index("Day"), use_container_width=True)
 with tab2:
+    st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
     # The "Bombproof" Controller
     if st.session_state.w_data is not None:
         render_forecast_display()
