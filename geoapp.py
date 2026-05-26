@@ -86,17 +86,36 @@ if "lon" not in st.session_state:
 if "fetch_error" not in st.session_state:
     st.session_state.fetch_error = None
 
+@st.cache_data(ttl=600)
+def cached_geo_search(city_name_query):
+    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name_query}&count=5&language=en&format=json"
+    response = requests.get(geo_url, timeout=10)
+    if response.status_code == 429:
+        raise requests.exceptions.HTTPError("429 Too Many Requests")
+    response.raise_for_status()
+    return response.json()
+
+@st.cache_data(ttl=600)
+def cached_weather_fetch(lat, lon):
+    weather_url = (
+        f"https://api.open-meteo.com/v1/forecast?latitude={lat}"
+        f"&longitude={lon}&current_weather=true"
+        f"&hourly=temperature_2m,relative_humidity_2m"
+        f"&daily=weathercode,temperature_2m_max,temperature_2m_min"
+        f"&timezone=auto&forecast_days=7"
+    )
+    response = requests.get(weather_url, timeout=10)
+    if response.status_code == 429:
+        raise requests.exceptions.HTTPError("429 Too Many Requests")
+    response.raise_for_status()
+    return response.json()
+
 # Helper function to fetch data and store it cleanly in state memory
 def fetch_weather_data(city_name_query):
     st.session_state.fetch_error = None
 
     try:
-        # Geocoding
-        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name_query}&count=5&language=en&format=json"
-        geo_res = requests.get(geo_url, timeout=10)
-        geo_res.raise_for_status()
-        geo_res = geo_res.json()
-
+        geo_res = cached_geo_search(city_name_query)
         if "results" in geo_res and len(geo_res["results"]) > 0:
             target_result = geo_res["results"][0]
             for res in geo_res["results"]:
@@ -113,22 +132,20 @@ def fetch_weather_data(city_name_query):
         else:
             st.session_state.fetch_error = "City not found. Please try a different location."
             return
+    except requests.exceptions.HTTPError as exc:
+        if "429" in str(exc):
+            st.session_state.fetch_error = (
+                "Too many requests to Open-Meteo. Please wait a minute and try again."
+            )
+        else:
+            st.session_state.fetch_error = f"Geocoding failed: {exc}"
+        return
     except Exception as exc:
         st.session_state.fetch_error = f"Geocoding failed: {exc}"
         return
 
     try:
-        # Core Weather API call
-        weather_url = (
-            f"https://api.open-meteo.com/v1/forecast?latitude={st.session_state.lat}"
-            f"&longitude={st.session_state.lon}&current_weather=true"
-            f"&hourly=temperature_2m,relative_humidity_2m"
-            f"&daily=weathercode,temperature_2m_max,temperature_2m_min"
-            f"&timezone=auto&forecast_days=7"
-        )
-        res = requests.get(weather_url, timeout=10)
-        res.raise_for_status()
-        res_data = res.json()
+        res_data = cached_weather_fetch(st.session_state.lat, st.session_state.lon)
         st.session_state.w_data = res_data
 
         if "current_weather" in res_data:
@@ -138,6 +155,13 @@ def fetch_weather_data(city_name_query):
                 st.session_state.hum_val = f"{res_data['hourly']['relative_humidity_2m'][0]}%"
         else:
             st.session_state.fetch_error = "Weather data is unavailable for this location."
+    except requests.exceptions.HTTPError as exc:
+        if "429" in str(exc):
+            st.session_state.fetch_error = (
+                "Too many requests to Open-Meteo. Please wait a minute and try again."
+            )
+        else:
+            st.session_state.fetch_error = f"Weather fetch failed: {exc}"
     except Exception as exc:
         st.session_state.fetch_error = f"Weather fetch failed: {exc}"
 
