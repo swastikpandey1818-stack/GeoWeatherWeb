@@ -382,7 +382,9 @@ with tab2:
                     table_data = [{"Date": d['dt_txt'], "Temp (°C)": d['main']['temp'], "Humidity (%)": d['main']['humidity']} for d in forecast_data]
                     st.table(pd.DataFrame(table_data))
                 else:
-                    st.error("OpenWeatherMap could not find the city or API key is invalid.")
+                  st.error("OpenWeatherMap could not find the city or API key is invalid.")
+
+with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.caption("⚡ Powered by Gemini 3.5 Flash")
     st.markdown("---")
