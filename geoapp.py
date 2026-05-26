@@ -200,47 +200,35 @@ with tab2:
     else:
         st.info("🔍 Run a location search inside Tab 1 to populate forecast logs.")
 # ==========================================
-# 💬 TAB 3: AI CHAT ENGINE (ISOLATED LOGIC)
+# 💬 TAB 3: AI CHAT ENGINE (GEMINI ONLY)
 # ==========================================
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # Initialize memory state
+    # Initialize memory
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    # Display past logs
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    # Handle Input
     if user_input := st.chat_input("Ask a weather query..."):
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.write(user_input)
 
         with st.chat_message("assistant"):
-            with st.spinner("Connecting to AI..."):
+            with st.spinner("Analyzing..."):
                 try:
-                    # 1. Try Gemini
+                    # Pointing strictly to your Google Key
                     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
                     model = genai.GenerativeModel('gemini-1.5-flash')
                     response = model.generate_content(user_input)
                     bot_reply = response.text
                 except Exception as e:
-                    # 2. Try OpenAI Fallback
-                    try:
-                        client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-                        resp = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[{"role": "user", "content": user_input}]
-                        )
-                        bot_reply = resp.choices[0].message.content
-                    except Exception as fatal_error:
-                        # 3. Print the REAL error here
-                        bot_reply = f"🚨 AI Engine Error: {str(fatal_error)}"
+                    bot_reply = f"🚨 AI Engine Error: {str(e)}"
 
                 st.write(bot_reply)
                 st.session_state.chat_history.append({"role": "assistant", "content": bot_reply})
