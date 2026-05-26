@@ -4,6 +4,27 @@ import openai
 import requests
 import pandas as pd
 import time
+import plotly.graph_objects as go
+
+def render_custom_bar_chart():
+    categories = ['Coffee', 'Tea', 'Juice', 'Soft Drink', 'Plant-based']
+    values = [100, 60, 70, 30, 40]
+    
+    fig = go.Figure(data=[go.Bar(
+        x=categories, y=values,
+        marker_color='#E4B062', # Match your specific orange tone
+        marker_line_width=0,
+        width=0.6
+    )])
+    
+    fig.update_layout(
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=False, showticklabels=False),
+        margin=dict(l=0, r=0, t=0, b=0)
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 # Page Configuration
 st.set_page_config(page_title="Swastik's GeoWeather Pro", page_icon="🌤️", layout="wide")
@@ -68,24 +89,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
-# Initialize Session States
-if "w_data" not in st.session_state:
-    st.session_state.w_data = None
-if "display_city" not in st.session_state:
-    st.session_state.display_city = "Gorakhpur, Uttar Pradesh, India"
-if "temp_val" not in st.session_state:
-    st.session_state.temp_val = "38°C"
-if "hum_val" not in st.session_state:
-    st.session_state.hum_val = "45%"
-if "wind_val" not in st.session_state:
-    st.session_state.wind_val = "14 km/h"
-if "lat" not in st.session_state:
-    st.session_state.lat = 26.7588
-if "lon" not in st.session_state:
-    st.session_state.lon = 83.3697
-if "fetch_error" not in st.session_state:
-    st.session_state.fetch_error = None
 
 def request_with_retry(url, timeout=15, retries=4, backoff=1):
     last_exception = None
@@ -279,16 +282,35 @@ def get_owm_forecast(city_name):
     return None
 
 # Update your tab2 block
+def render_custom_bar_chart(forecast_data):
+    """Renders the minimalist bar chart for temperatures."""
+    dates = [d['dt_txt'].split(' ')[0] for d in forecast_data]
+    temps = [d['main']['temp'] for d in forecast_data]
+    
+    fig = go.Figure(data=[go.Bar(
+        x=dates, y=temps,
+        marker_color='#E4B062',
+        marker_line_width=0,
+        width=0.6
+    )])
+    
+    fig.update_layout(
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=False, showticklabels=False),
+        margin=dict(l=0, r=0, t=20, b=0)
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+# Update your tab2 block in the script
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 Extended Forecast</h2>", unsafe_allow_html=True)
 
-    # Primary Display
     if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
         render_forecast_display()
     else:
         st.warning("Primary forecast data unavailable.")
-        
-        # Secondary Option: OWM Fallback
         st.markdown("---")
         st.subheader("Try Secondary Source (OpenWeatherMap)")
         manual_city = st.text_input("Enter city for OWM fallback:", key="owm_fallback_input")
@@ -312,13 +334,16 @@ with tab2:
                                 </div>
                             """, unsafe_allow_html=True)
                     
-                    # 2. Infographic Table
+                    # 2. Add the custom chart
+                    st.subheader("Temperature Trend")
+                    render_custom_bar_chart(forecast_data)
+                    
+                    # 3. Infographic Table
                     st.subheader("Humidity & Temperature Metrics")
                     table_data = [{"Date": d['dt_txt'], "Temp (°C)": d['main']['temp'], "Humidity (%)": d['main']['humidity']} for d in forecast_data]
                     st.table(pd.DataFrame(table_data))
                 else:
                     st.error("OpenWeatherMap could not find the city or API key is invalid.")
-with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.caption("⚡ Powered by Gemini 3.5 Flash")
     st.markdown("---")
