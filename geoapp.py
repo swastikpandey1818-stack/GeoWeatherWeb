@@ -141,7 +141,7 @@ with tab1:
     
     st.markdown('<div class="weather-card">', unsafe_allow_html=True)
     st.markdown("<h3 style='margin-top:0; font-size:1.2rem; color:#FFD700;'>🔍 Search Regional Conditions</h3>", unsafe_allow_html=True)
-    city_input = st.text_input("Enter city name:", value="Gorakhpur", placeholder="e.g., Gorakhpur, Delhi, London", label_visibility="collapsed")
+    city_input = st.text_input("Enter city name:",value = None, placeholder="e.g., Gorakhpur, Delhi, London", label_visibility="collapsed")
     search_button = st.button("Get Live Metrics")
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -166,14 +166,14 @@ with tab1:
 # ==========================================
 # 🔮 TAB 2: 7-DAY FORECAST WITH EMOJIS
 # ==========================================
+# ==========================================
+# 🔮 TAB 2: 7-DAY FORECAST (STABILIZED)
+# ==========================================
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
     st.markdown("---")
-    # Force an initial fetch if it's the very first time the app is opened
-    if st.session_state.w_data is None:
-               fetch_weather_data("Gorakhpur")
-               st.rerun()
-    # This forces the app to refresh and populate the data immediately
+
+    # 1. The "State Gate": Only attempt to render if we have data
     if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
         try:
             daily = st.session_state.w_data["daily"]
@@ -182,7 +182,6 @@ with tab2:
             
             for i in range(len(dates)):
                 code = daily["weathercode"][i]
-                # ... (Keep your existing emoji logic)
                 if code in [0, 1]: emoji = "☀️ Sunny"
                 elif code in [2, 3]: emoji = "☁️ Partly Cloudy"
                 elif code in [45, 48]: emoji = "🌫️ Foggy"
@@ -203,13 +202,14 @@ with tab2:
             st.markdown('</div>', unsafe_allow_html=True)
             
         except Exception as e:
-            # 2. Print the REAL error instead of the custom message
-            st.error(f"Technical Data Error: {e}")
-            st.write("Raw data sample:", st.session_state.w_data.keys())
+            st.error(f"Render Error: {e}")
+            
+    # 2. If data is missing, offer a clear path to fetch it
     else:
-      
-        st.info("🔍 Loading weather data... please ensure a location is selected.,default Gorakhpur")
-
+        st.warning("Forecast data not ready.")
+        if st.button("Manual Refresh Forecast"):
+            fetch_weather_data(st.session_state.display_city.split(',')[0])
+            st.rerun()
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.caption("⚡ Powered by Gemini 3.5 Flash")
