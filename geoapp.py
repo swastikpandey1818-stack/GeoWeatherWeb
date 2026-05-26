@@ -169,7 +169,7 @@ with tab1:
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
     st.markdown("---")
-    if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
+    if st.session_state.w_data is not None and "daily" in st.session_state.w_data
         try:
             daily = st.session_state.w_data["daily"]
             dates = pd.to_datetime(daily["time"])
