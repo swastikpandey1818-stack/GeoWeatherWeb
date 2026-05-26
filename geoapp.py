@@ -4,13 +4,12 @@ import streamlit as st
 import streamlit.components.v1 as components
 from geopy.geocoders import Nominatim
 import pandas as pd
-import google.generativeai as genai
 
 # 1. Page Configuration Setup
 st.set_page_config(
     page_title="Swastik GeoWeather - Live Weather App",
     page_icon="⚡",
-    layout="wide", # Adjusted to wide to let premium card grids look uniform on desktops
+    layout="wide", 
     initial_sidebar_state="collapsed"
 )
 
@@ -201,11 +200,11 @@ with tab2:
         st.info("ℹ️ Please enter and process a location query inside Tab 1 first to load extended charts.")
 
 # ==========================================
-# 💬 TAB 3: AI CHAT WITH FALLBACK
+# 💬 TAB 3: AI CHAT (STABLE HTTP REQUESTS)
 # ==========================================
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
-    st.caption("⚡ Powered by Gemini Engine")
+    st.caption("⚡ Powered by Gemini Engine (Stable API Access Node)")
     st.markdown("---")
 
     if "chat_history" not in st.session_state:
@@ -217,7 +216,7 @@ with tab3:
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    system_rules = "You are 'GeoWeather Pro AI', an expert meteorological intelligence assistant. Answer briefly."
+    system_rules = "You are 'GeoWeather Pro AI', an expert meteorological intelligence assistant. Answer briefly and concisely."
 
     if user_input := st.chat_input("Ask a weather query..."):
         st.session_state.chat_history.append({"role": "user", "content": user_input})
@@ -228,17 +227,32 @@ with tab3:
             with st.spinner("Processing atmospheric cloud queries..."):
                 bot_reply = ""
                 try:
-                    # Pointing to Gemini API Key stored safely inside cloud environment
-                    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+                    # Fetching the private key safely from your dashboard secrets vault
+                    api_key = st.secrets["GOOGLE_API_KEY"]
                     
-                    # 💡 FIX: Use the clean model string format directly
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    # Direct standard HTTP REST URL for the stable production endpoint
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
                     
-                    response = model.generate_content(f"{system_rules}\nUser Query: {user_input}")
-                    bot_reply = response.text.strip()
+                    # Formulate direct payload block mapping parameters cleanly
+                    payload = {
+                        "contents": [{
+                            "parts": [{
+                                "text": f"{system_rules}\nUser Query: {user_input}"
+                            }]
+                        }]
+                    }
+                    
+                    # Fire standard request payload straight over the internet tunnel
+                    res = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+                    
+                    if res.status_code == 200:
+                        response_data = res.json()
+                        bot_reply = response_data['candidates'][0]['content']['parts'][0]['text'].strip()
+                    else:
+                        bot_reply = f"🚨 API Server returned status code {res.status_code}. Details: {res.text}"
+                        
                 except Exception as e:
-                    bot_reply = f"🚨 System pipeline busy or API key configuration missing. Details: {e}"
-                    bot_reply = f"🚨 System pipeline busy or API key configuration missing. Details: {e}"
+                    bot_reply = f"🚨 Network pipe connection tracking dropped. Error context details: {e}"
 
                 st.write(bot_reply)
                 st.session_state.chat_history.append({"role": "assistant", "content": bot_reply})
