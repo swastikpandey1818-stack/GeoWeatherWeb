@@ -83,43 +83,63 @@ if "lat" not in st.session_state:
     st.session_state.lat = 26.7588
 if "lon" not in st.session_state:
     st.session_state.lon = 83.3697
+if "fetch_error" not in st.session_state:
+    st.session_state.fetch_error = None
 
 # Helper function to fetch data and store it cleanly in state memory
 def fetch_weather_data(city_name_query):
+    st.session_state.fetch_error = None
+
     try:
         # Geocoding
         geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name_query}&count=5&language=en&format=json"
-        geo_res = requests.get(geo_url).json()
-        
+        geo_res = requests.get(geo_url, timeout=10)
+        geo_res.raise_for_status()
+        geo_res = geo_res.json()
+
         if "results" in geo_res and len(geo_res["results"]) > 0:
             target_result = geo_res["results"][0]
             for res in geo_res["results"]:
                 if res.get("admin1") == "Uttar Pradesh":
                     target_result = res
                     break
-            
+
             st.session_state.lat = target_result["latitude"]
             st.session_state.lon = target_result["longitude"]
             c_name = target_result["name"]
             country = target_result.get("country", "")
             admin = target_result.get("admin1", "")
             st.session_state.display_city = f"{c_name}, {admin}, {country}" if admin else f"{c_name}, {country}"
-    except Exception:
-        pass
+        else:
+            st.session_state.fetch_error = "City not found. Please try a different location."
+            return
+    except Exception as exc:
+        st.session_state.fetch_error = f"Geocoding failed: {exc}"
+        return
 
     try:
         # Core Weather API call
-        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={st.session_state.lat}&longitude={st.session_state.lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
-        res_data = requests.get(weather_url).json()
+        weather_url = (
+            f"https://api.open-meteo.com/v1/forecast?latitude={st.session_state.lat}"
+            f"&longitude={st.session_state.lon}&current_weather=true"
+            f"&hourly=temperature_2m,relative_humidity_2m"
+            f"&daily=weathercode,temperature_2m_max,temperature_2m_min"
+            f"&timezone=auto&forecast_days=7"
+        )
+        res = requests.get(weather_url, timeout=10)
+        res.raise_for_status()
+        res_data = res.json()
         st.session_state.w_data = res_data
-        
+
         if "current_weather" in res_data:
             st.session_state.temp_val = f"{res_data['current_weather']['temperature']}°C"
             st.session_state.wind_val = f"{res_data['current_weather']['windspeed']} km/h"
-            if "hourly" in res_data:
+            if "hourly" in res_data and "relative_humidity_2m" in res_data["hourly"]:
                 st.session_state.hum_val = f"{res_data['hourly']['relative_humidity_2m'][0]}%"
-    except Exception:
-        pass
+        else:
+            st.session_state.fetch_error = "Weather data is unavailable for this location."
+    except Exception as exc:
+        st.session_state.fetch_error = f"Weather fetch failed: {exc}"
 
 # Bootstrapping: If the app just opened up, run an initial background fetch for Gorakhpur right away
 if st.session_state.w_data is None:
@@ -167,27 +187,23 @@ with tab1:
 # 🔮 TAB 2: PREMIUM FORECAST & INFOGRAPHICS
 # ==========================================
 
-# 1. Define the function first (Outside the tab block)
-
-with tab2:
-    def render_forecast_display():
-      """Renders the creative cards and table if data exists."""
-    
-    # Check if 'w_data' is None or missing the 'daily' key
-      if st.session_state.w_data is None or "daily" not in st.session_state.w_data:
+def render_forecast_display():
+    """Renders the creative cards and table if data exists."""
+    if st.session_state.w_data is None or "daily" not in st.session_state.w_data:
         st.warning("Forecast data is currently unavailable. Please try searching for the city again.")
         return
 
-      daily = st.session_state.w_data["daily"]
-      dates = pd.to_datetime(daily["time"])
-    
-      st.subheader(f"Analysis for: **{st.session_state.display_city}**")
-    
-    # 7-DAY CREATIVE CARDS
-      cols = st.columns(7)
-      for i, col in enumerate(cols):
-        # Add a safety check for the index to avoid IndexError
-         if i < len(daily["weathercode"]):
+    daily = st.session_state.w_data["daily"]
+    if not daily.get("time") or not daily.get("temperature_2m_max"):
+        st.warning("Incomplete forecast data received from the API.")
+        return
+
+    dates = pd.to_datetime(daily["time"])
+    st.subheader(f"Analysis for: **{st.session_state.display_city}**")
+
+    cols = st.columns(7)
+    for i, col in enumerate(cols):
+        if i < len(daily["weathercode"]):
             code = daily["weathercode"][i]
             emoji = "☀️" if code in [0, 1] else "☁️" if code in [2, 3] else "🌧️"
             with col:
@@ -199,28 +215,28 @@ with tab2:
                     </div>
                 """, unsafe_allow_html=True)
 
-    # INFOGRAPHIC TABLE
-      df = pd.DataFrame({
-        "Day": dates.strftime('%A'), 
-        "Max (°C)": daily["temperature_2m_max"], 
+    df = pd.DataFrame({
+        "Day": dates.strftime('%A'),
+        "Max (°C)": daily["temperature_2m_max"],
         "Min (°C)": daily["temperature_2m_min"]
-      })
-      st.dataframe(df.set_index("Day"), use_container_width=True)
+    })
+    st.dataframe(df.set_index("Day"), use_container_width=True)
 
-
+with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
-    
-    # Check if data exists in the session state
-    if st.session_state.w_data is not None:
+
+    if st.session_state.fetch_error:
+        st.error(st.session_state.fetch_error)
+
+    if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
         render_forecast_display()
     else:
         st.markdown("#### Enter a location to view the forecast:")
         manual_city = st.text_input("City name:", key="tab2_input")
-        
-        if st.button("Load Forecast"):
+        if st.button("Load Forecast", key="tab2_load"):
             if manual_city:
                 fetch_weather_data(manual_city)
-                st.rerun() # Refresh to populate the session state
+                st.rerun()
             else:
                 st.error("Please enter a city name to proceed.")
           
