@@ -167,66 +167,47 @@ with tab1:
 # ==========================================
 # 🔮 TAB 2: PREMIUM FORECAST & INFOGRAPHICS
 # ==========================================
-with tab2:
-    st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
-    
-    # Ensure data exists before rendering
-    if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
-        daily = st.session_state.w_data["daily"]
-        dates = pd.to_datetime(daily["time"])
-        
-        st.write(f"Displaying meteorological outlook for: **{st.session_state.display_city}**")
-        
-        # 1. 7-DAY CREATIVE CARDS
-        st.markdown("### 🗓️ Weekly Trend")
-        cols = st.columns(7)
-        for i, col in enumerate(cols):
-            code = daily["weathercode"][i]
-            # Creative Emoji logic
-            if code in [0, 1]: emoji = "☀️"
-            elif code in [2, 3]: emoji = "☁️"
-            elif code in [45, 48]: emoji = "🌫️"
-            elif code in [51, 65]: emoji = "🌧️"
-            elif code in [71, 75]: emoji = "❄️"
-            else: emoji = "🌤️"
-            
-            with col:
-                st.markdown(f"""
-                    <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; text-align:center;">
-                        <small>{dates[i].strftime('%a')}</small><br>
-                        <span style="font-size:1.5rem;">{emoji}</span><br>
-                        <strong>{daily['temperature_2m_max'][i]}°</strong><br>
-                        <small style="color:#888;">{daily['temperature_2m_min'][i]}°</small>
-                    </div>
-                """, unsafe_allow_html=True)
 
-        # 2. ATMOSPHERIC INFOGRAPHIC TABLE
-        st.markdown("### 📊 Atmospheric Summary Table")
-        infographic_data = pd.DataFrame({
-            "Day": dates.strftime('%A (%b %d)'),
-            "Max Temp (°C)": daily["temperature_2m_max"],
-            "Min Temp (°C)": daily["temperature_2m_min"],
-            "Condition Code": daily["weathercode"]
-        })
-        
-        # Styling the table with Streamlit's dataframe styling
-        st.dataframe(
-            infographic_data.set_index("Day"),
-            use_container_width=True,
-            column_config={
-                "Max Temp (°C)": st.column_config.NumberColumn(format="%d°C"),
-                "Min Temp (°C)": st.column_config.NumberColumn(format="%d°C")
-            }
-        )
-        
+st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
+
+def render_forecast_display():
+    # Renders the creative cards and table if data exists
+      daily = st.session_state.w_data["daily"]
+      dates = pd.to_datetime(daily["time"])
+    
+      st.subheader(f"Analysis for: **{st.session_state.display_city}**")
+    
+    # 7-DAY CREATIVE CARDS
+      cols = st.columns(7)
+      for i, col in enumerate(cols):
+        code = daily["weathercode"][i]
+        emoji = "☀️" if code in [0, 1] else "☁️" if code in [2, 3] else "🌧️"
+        with col:
+            st.markdown(f"""
+                <div style="padding:10px; text-align:center;">
+                    <small>{dates[i].strftime('%a')}</small><br>
+                    <span style="font-size:1.5rem;">{emoji}</span><br>
+                    <strong>{daily['temperature_2m_max'][i]}°</strong>
+                </div>
+            """, unsafe_allow_html=True)
+
+    # INFOGRAPHIC TABLE
+      df = pd.DataFrame({"Day": dates.strftime('%A'), "Max": daily["temperature_2m_max"], "Min": daily["temperature_2m_min"]})
+      st.dataframe(df.set_index("Day"), use_container_width=True)
+with tab2:
+    # The "Bombproof" Controller
+    if st.session_state.w_data is not None:
+        render_forecast_display()
     else:
-        st.info("🔍 Please select a location in the 'Live Weather Metrics' tab to generate your forecast.")
-        
-        # Fallback manual search input for convenience
-        local_city = st.text_input("Or enter city directly here:", key="tab2_fallback")
-        if st.button("Generate Forecast"):
-            fetch_weather_data(local_city)
-            st.rerun()
+        st.markdown("#### Enter a location to view the forecast:")
+        manual_city = st.text_input("City name:", key="tab2_input")
+        if st.button("Load Forecast"):
+            if manual_city:
+                fetch_weather_data(manual_city)
+                st.rerun()
+            else:
+                render_forecast_display()
+          
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.caption("⚡ Powered by Gemini 3.5 Flash")
