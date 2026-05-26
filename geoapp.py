@@ -9,6 +9,32 @@ from geopy.geocoders import Nominatim
 # Initialize geolocator
 
 
+def get_weather_info(code):
+    mapping = {
+        0: ("Clear sky", "☀️"),
+        1: ("Mainly clear", "🌤️"),
+        2: ("Partly cloudy", "⛅"),
+        3: ("Overcast", "☁️"),
+        45: ("Fog", "🌫️"),
+        48: ("Depositing rime fog", "🌫️"),
+        51: ("Light drizzle", "🌦️"),
+        53: ("Moderate drizzle", "🌦️"),
+        55: ("Dense drizzle", "🌧️"),
+        61: ("Light rain", "🌦️"),
+        63: ("Moderate rain", "🌧️"),
+        65: ("Heavy rain", "⛈️"),
+        71: ("Light snow", "🌨️"),
+        73: ("Moderate snow", "🌨️"),
+        75: ("Heavy snow", "❄️"),
+        80: ("Light rain showers", "🌦️"),
+        81: ("Moderate rain showers", "🌧️"),
+        82: ("Heavy rain showers", "⛈️"),
+        95: ("Thunderstorm", "⚡"),
+        96: ("Thunderstorm with hail", "⛈️"),
+        99: ("Thunderstorm with heavy hail", "⛈️")
+    }
+    return mapping.get(code, ("Unknown", "❓"))
+
 geolocator = Nominatim(user_agent="geoweather_app")
 if "w_data" not in st.session_state:
     st.session_state.w_data = None
@@ -166,6 +192,14 @@ def cached_weather_fetch(lat, lon):
 def fetch_weather_data(city_name_query):
     st.session_state.fetch_error = None
     st.session_state.fetch_error = None
+
+    # Inside fetch_weather_data:
+    if "current_weather" in res_data:
+       w_code = res_data['current_weather']['weathercode']
+       desc, emoji = get_weather_info(w_code)
+       st.session_state.weather_desc = desc
+       st.session_state.weather_emoji = emoji
+    # ... rest of your code
     try:
         # Using geopy instead of Open-Meteo geocoding
         location = geolocator.geocode(city_name_query)
@@ -238,8 +272,20 @@ with tab1:
     if search_button and city_input:
         st.session_state.current_city = city_input
         fetch_weather_data(city_input)
+    
 
     st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
+    # Initialize these in init_app_state() too
+# "weather_desc": "N/A", "weather_emoji": "❓"
+
+    with st.columns(1)[0]: # Or add a 4th column
+       st.markdown(f'''
+        <div class="weather-card" style="text-align: center;">
+            <h2>{st.session_state.get("weather_emoji", "❓")}</h2>
+            <p style="color:#888;">Condition</p>
+            <h3>{st.session_state.get("weather_desc", "N/A")}</h3>
+        </div>
+        ''', unsafe_allow_html=True)
     m_col1, m_col2, m_col3 = st.columns(3)
     
     m_col1, m_col2, m_col3 = st.columns(3)
