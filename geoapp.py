@@ -267,59 +267,126 @@ with tab1:
     
     st.markdown('<div class="weather-card">', unsafe_allow_html=True)
     st.markdown("<h3 style='margin-top:0; font-size:1.2rem; color:#FFD700;'>🔍 Search Regional Conditions</h3>", unsafe_allow_html=True)
-    city_input = st.text_input("Enter city name:",value = None, placeholder="e.g., Gorakhpur, Delhi, London", label_visibility="collapsed")
+    
+    city_input = st.text_input("Enter city name:", value="", placeholder="e.g., Gorakhpur, Delhi, London", label_visibility="collapsed")
     search_button = st.button("Get Live Metrics")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    if 'selected_city' not in st.session_state:
-     st.session_state.selected_city = None
     if search_button and city_input:
-        st.session_state.current_city = city_input
-        fetch_weather_data(city_input)
+        with st.spinner(f"Fetching data for {city_input}..."):
+            fetch_weather_data(city_input)
+            st.rerun() # Refresh to update UI immediately
     
+    # Conditional Rendering: Only show if location data exists
+    if st.session_state.lat is not None:
+        st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
+        
+        # Condition Card
+        st.markdown(f'''
+            <div class="weather-card" style="text-align: center;">
+                <h2>{st.session_state.get("weather_emoji", "❓")}</h2>
+                <p style="color:#888;">Condition</p>
+                <h3>{st.session_state.get("weather_desc", "N/A")}</h3>
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        # Metrics Columns
+        m_col1, m_col2, m_col3 = st.columns(3)
+        
+        with m_col1:
+            st.markdown(f'''
+                <div class="weather-card" style="text-align: center;">
+                    <h2>🌡️</h2><p style="color:#888;">Temperature</p>
+                    <h2>{st.session_state.get("temp_val", "--")}</h2>
+                </div>
+            ''', unsafe_allow_html=True)
 
-    st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
-    # Initialize these in init_app_state() too
-# "weather_desc": "N/A", "weather_emoji": "❓"
+        with m_col2:
+            st.markdown(f'''
+                <div class="weather-card" style="text-align: center;">
+                    <h2>💧</h2><p style="color:#888;">Humidity</p>
+                    <h2>{st.session_state.get("hum_val", "--")}</h2>
+                </div>
+            ''', unsafe_allow_html=True)
 
-    with st.columns(1)[0]: # Or add a 4th column
-       st.markdown(f'''
-        <div class="weather-card" style="text-align: center;">
-            <h2>{st.session_state.get("weather_emoji", "❓")}</h2>
-            <p style="color:#888;">Condition</p>
-            <h3>{st.session_state.get("weather_desc", "N/A")}</h3>
+        with m_col3:
+            st.markdown(f'''
+                <div class="weather-card" style="text-align: center;">
+                    <h2>💨</h2><p style="color:#888;">Wind Velocity</p>
+                    <h2>{st.session_state.get("wind_val", "--")}</h2>
+                </div>
+            ''', unsafe_allow_html=True)
+
+        st.markdown('### 🗺️ Geospatial Vector View')
+        st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
+    else:
+        st.info("Enter a city above to see live weather metrics.")# ==========================================
+# 📊 TAB 1: LIVE WEATHER METRICS & SEARCH
+# ==========================================
+with tab1:
+    st.markdown("""
+        <div style='text-align: center; padding: 15px 0px;'>
+            <h1 style='font-size: 2.5rem; margin-bottom: 0;'>🚀 <span class='gradient-text'>GeoWeather Pro</span></h1>
+            <p style='color: #888888; font-size: 1rem;'>Enterprise-Grade Atmospheric Tracking Engine</p>
         </div>
-        ''', unsafe_allow_html=True)
-    m_col1, m_col2, m_col3 = st.columns(3)
+    """, unsafe_allow_html=True)
     
-    m_col1, m_col2, m_col3 = st.columns(3)
+    st.markdown('<div class="weather-card">', unsafe_allow_html=True)
+    st.markdown("<h3 style='margin-top:0; font-size:1.2rem; color:#FFD700;'>🔍 Search Regional Conditions</h3>", unsafe_allow_html=True)
     
-    with m_col1:
+    city_input = st.text_input("Enter city name:", value="", placeholder="e.g., Gorakhpur, Delhi, London", label_visibility="collapsed")
+    search_button = st.button("Get Live Metrics")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    if search_button and city_input:
+        with st.spinner(f"Fetching data for {city_input}..."):
+            fetch_weather_data(city_input)
+            st.rerun() # Refresh to update UI immediately
+    
+    # Conditional Rendering: Only show if location data exists
+    if st.session_state.lat is not None:
+        st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
+        
+        # Condition Card
         st.markdown(f'''
             <div class="weather-card" style="text-align: center;">
-                <h2>🌡️</h2><p style="color:#888;">Temperature</p>
-                <h2>{st.session_state.get("temp_val", "--")}</h2>
+                <h2>{st.session_state.get("weather_emoji", "❓")}</h2>
+                <p style="color:#888;">Condition</p>
+                <h3>{st.session_state.get("weather_desc", "N/A")}</h3>
             </div>
         ''', unsafe_allow_html=True)
+        
+        # Metrics Columns
+        m_col1, m_col2, m_col3 = st.columns(3)
+        
+        with m_col1:
+            st.markdown(f'''
+                <div class="weather-card" style="text-align: center;">
+                    <h2>🌡️</h2><p style="color:#888;">Temperature</p>
+                    <h2>{st.session_state.get("temp_val", "--")}</h2>
+                </div>
+            ''', unsafe_allow_html=True)
 
-    with m_col2:
-        st.markdown(f'''
-            <div class="weather-card" style="text-align: center;">
-                <h2>💧</h2><p style="color:#888;">Humidity</p>
-                <h2>{st.session_state.get("hum_val", "--")}</h2>
-            </div>
-        ''', unsafe_allow_html=True)
+        with m_col2:
+            st.markdown(f'''
+                <div class="weather-card" style="text-align: center;">
+                    <h2>💧</h2><p style="color:#888;">Humidity</p>
+                    <h2>{st.session_state.get("hum_val", "--")}</h2>
+                </div>
+            ''', unsafe_allow_html=True)
 
-    with m_col3:
-        st.markdown(f'''
-            <div class="weather-card" style="text-align: center;">
-                <h2>💨</h2><p style="color:#888;">Wind Velocity</p>
-                <h2>{st.session_state.get("wind_val", "--")}</h2>
-            </div>
-        ''', unsafe_allow_html=True)
+        with m_col3:
+            st.markdown(f'''
+                <div class="weather-card" style="text-align: center;">
+                    <h2>💨</h2><p style="color:#888;">Wind Velocity</p>
+                    <h2>{st.session_state.get("wind_val", "--")}</h2>
+                </div>
+            ''', unsafe_allow_html=True)
 
-    st.markdown('### 🗺️ Geospatial Vector View')
-    st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
+        st.markdown('### 🗺️ Geospatial Vector View')
+        st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
+    else:
+        st.info("Enter a city above to see live weather metrics.")
 # ==========================================
 # 🔮 TAB 2: PREMIUM FORECAST & INFOGRAPHICS
 # ==========================================
