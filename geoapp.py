@@ -168,37 +168,46 @@ with tab1:
 # ==========================================
 
 # 1. Define the function first (Outside the tab block)
-def render_forecast_display():
-    """Renders the creative cards and table if data exists."""
-    daily = st.session_state.w_data["daily"]
-    dates = pd.to_datetime(daily["time"])
+
+with tab2:
+    def render_forecast_display():
+      """Renders the creative cards and table if data exists."""
     
-    st.subheader(f"Analysis for: **{st.session_state.display_city}**")
+    # Check if 'w_data' is None or missing the 'daily' key
+      if st.session_state.w_data is None or "daily" not in st.session_state.w_data:
+        st.warning("Forecast data is currently unavailable. Please try searching for the city again.")
+        return
+
+      daily = st.session_state.w_data["daily"]
+      dates = pd.to_datetime(daily["time"])
+    
+      st.subheader(f"Analysis for: **{st.session_state.display_city}**")
     
     # 7-DAY CREATIVE CARDS
-    cols = st.columns(7)
-    for i, col in enumerate(cols):
-        code = daily["weathercode"][i]
-        emoji = "☀️" if code in [0, 1] else "☁️" if code in [2, 3] else "🌧️"
-        with col:
-            st.markdown(f"""
-                <div style="padding:10px; text-align:center; background:rgba(255,255,255,0.05); border-radius:10px;">
-                    <small>{dates[i].strftime('%a')}</small><br>
-                    <span style="font-size:1.5rem;">{emoji}</span><br>
-                    <strong>{daily['temperature_2m_max'][i]}°</strong>
-                </div>
-            """, unsafe_allow_html=True)
+      cols = st.columns(7)
+      for i, col in enumerate(cols):
+        # Add a safety check for the index to avoid IndexError
+         if i < len(daily["weathercode"]):
+            code = daily["weathercode"][i]
+            emoji = "☀️" if code in [0, 1] else "☁️" if code in [2, 3] else "🌧️"
+            with col:
+                st.markdown(f"""
+                    <div style="padding:10px; text-align:center; background:rgba(255,255,255,0.05); border-radius:10px;">
+                        <small>{dates[i].strftime('%a')}</small><br>
+                        <span style="font-size:1.5rem;">{emoji}</span><br>
+                        <strong>{daily['temperature_2m_max'][i]}°</strong>
+                    </div>
+                """, unsafe_allow_html=True)
 
     # INFOGRAPHIC TABLE
-    df = pd.DataFrame({
+      df = pd.DataFrame({
         "Day": dates.strftime('%A'), 
         "Max (°C)": daily["temperature_2m_max"], 
         "Min (°C)": daily["temperature_2m_min"]
-    })
-    st.dataframe(df.set_index("Day"), use_container_width=True)
+      })
+      st.dataframe(df.set_index("Day"), use_container_width=True)
 
-# 2. Logic inside the tab block
-with tab2:
+
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
     
     # Check if data exists in the session state
