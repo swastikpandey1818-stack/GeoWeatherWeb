@@ -3,6 +3,7 @@ import google.generativeai as genai
 import openai
 import requests
 import pandas as pd
+import time
 
 # Page Configuration
 st.set_page_config(page_title="Swastik's GeoWeather Pro", page_icon="🌤️", layout="wide")
@@ -86,13 +87,22 @@ if "lon" not in st.session_state:
 if "fetch_error" not in st.session_state:
     st.session_state.fetch_error = None
 
+def request_with_retry(url, timeout=10, retries=3, backoff=1):
+    for attempt in range(retries):
+        response = requests.get(url, timeout=timeout)
+        if response.status_code == 429:
+            if attempt == retries - 1:
+                response.raise_for_status()
+            time.sleep(backoff * (2 ** attempt))
+            continue
+        response.raise_for_status()
+        return response
+    raise requests.exceptions.HTTPError("429 Too Many Requests")
+
 @st.cache_data(ttl=600)
 def cached_geo_search(city_name_query):
     geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name_query}&count=5&language=en&format=json"
-    response = requests.get(geo_url, timeout=10)
-    if response.status_code == 429:
-        raise requests.exceptions.HTTPError("429 Too Many Requests")
-    response.raise_for_status()
+    response = request_with_retry(geo_url)
     return response.json()
 
 @st.cache_data(ttl=600)
@@ -104,10 +114,7 @@ def cached_weather_fetch(lat, lon):
         f"&daily=weathercode,temperature_2m_max,temperature_2m_min"
         f"&timezone=auto&forecast_days=7"
     )
-    response = requests.get(weather_url, timeout=10)
-    if response.status_code == 429:
-        raise requests.exceptions.HTTPError("429 Too Many Requests")
-    response.raise_for_status()
+    response = request_with_retry(weather_url)
     return response.json()
 
 # Helper function to fetch data and store it cleanly in state memory
