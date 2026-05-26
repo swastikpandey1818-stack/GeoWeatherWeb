@@ -1,7 +1,8 @@
-streamlit
 geopy
+pandas
+openai
+streamlit
+google-generativeai
 requests
 pandas
-google-generativeai
-openai
-ploty
+plotly

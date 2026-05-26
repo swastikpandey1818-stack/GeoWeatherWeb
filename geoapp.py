@@ -5,7 +5,9 @@ import requests
 import pandas as pd
 import time
 import plotly.graph_objects as go
-
+from geopy.geocoders import Nominatim
+# Initialize geolocator
+geolocator = Nominatim(user_agent="geoweather_app")
 def render_custom_bar_chart():
     categories = ['Coffee', 'Tea', 'Juice', 'Soft Drink', 'Plant-based']
     values = [100, 60, 70, 30, 40]
@@ -137,25 +139,20 @@ def cached_weather_fetch(lat, lon):
 # Helper function to fetch data and store it cleanly in state memory
 def fetch_weather_data(city_name_query):
     st.session_state.fetch_error = None
-
+    st.session_state.fetch_error = None
     try:
-        geo_res = cached_geo_search(city_name_query)
-        if "results" in geo_res and len(geo_res["results"]) > 0:
-            target_result = geo_res["results"][0]
-            for res in geo_res["results"]:
-                if res.get("admin1") == "Uttar Pradesh":
-                    target_result = res
-                    break
-
-            st.session_state.lat = target_result["latitude"]
-            st.session_state.lon = target_result["longitude"]
-            c_name = target_result["name"]
-            country = target_result.get("country", "")
-            admin = target_result.get("admin1", "")
-            st.session_state.display_city = f"{c_name}, {admin}, {country}" if admin else f"{c_name}, {country}"
+        # Using geopy instead of Open-Meteo geocoding
+        location = geolocator.geocode(city_name_query)
+        if location:
+            st.session_state.lat = location.latitude
+            st.session_state.lon = location.longitude
+            st.session_state.display_city = location.address
         else:
-            st.session_state.fetch_error = "City not found. Please try a different location."
+            st.session_state.fetch_error = "City not found via GeoPy."
             return
+    except Exception as e:
+        st.session_state.fetch_error = f"Geocoding error: {e}"
+        return
     except requests.exceptions.HTTPError as exc:
         if "429" in str(exc):
             st.session_state.fetch_error = (
