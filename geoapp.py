@@ -163,28 +163,26 @@ with tab1:
 
     st.markdown('### 🗺️ Geospatial Vector View')
     st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
-
 # ==========================================
 # 🔮 TAB 2: PREMIUM FORECAST & INFOGRAPHICS
 # ==========================================
 
-
-
+# 1. Define the function first (Outside the tab block)
 def render_forecast_display():
-    # Renders the creative cards and table if data exists
-      daily = st.session_state.w_data["daily"]
-      dates = pd.to_datetime(daily["time"])
+    """Renders the creative cards and table if data exists."""
+    daily = st.session_state.w_data["daily"]
+    dates = pd.to_datetime(daily["time"])
     
-      st.subheader(f"Analysis for: **{st.session_state.display_city}**")
+    st.subheader(f"Analysis for: **{st.session_state.display_city}**")
     
     # 7-DAY CREATIVE CARDS
-      cols = st.columns(7)
-      for i, col in enumerate(cols):
+    cols = st.columns(7)
+    for i, col in enumerate(cols):
         code = daily["weathercode"][i]
         emoji = "☀️" if code in [0, 1] else "☁️" if code in [2, 3] else "🌧️"
         with col:
             st.markdown(f"""
-                <div style="padding:10px; text-align:center;">
+                <div style="padding:10px; text-align:center; background:rgba(255,255,255,0.05); border-radius:10px;">
                     <small>{dates[i].strftime('%a')}</small><br>
                     <span style="font-size:1.5rem;">{emoji}</span><br>
                     <strong>{daily['temperature_2m_max'][i]}°</strong>
@@ -192,22 +190,30 @@ def render_forecast_display():
             """, unsafe_allow_html=True)
 
     # INFOGRAPHIC TABLE
-      df = pd.DataFrame({"Day": dates.strftime('%A'), "Max": daily["temperature_2m_max"], "Min": daily["temperature_2m_min"]})
-      st.dataframe(df.set_index("Day"), use_container_width=True)
+    df = pd.DataFrame({
+        "Day": dates.strftime('%A'), 
+        "Max (°C)": daily["temperature_2m_max"], 
+        "Min (°C)": daily["temperature_2m_min"]
+    })
+    st.dataframe(df.set_index("Day"), use_container_width=True)
+
+# 2. Logic inside the tab block
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
-    # The "Bombproof" Controller
+    
+    # Check if data exists in the session state
     if st.session_state.w_data is not None:
         render_forecast_display()
     else:
         st.markdown("#### Enter a location to view the forecast:")
         manual_city = st.text_input("City name:", key="tab2_input")
+        
         if st.button("Load Forecast"):
             if manual_city:
                 fetch_weather_data(manual_city)
-                st.rerun()
+                st.rerun() # Refresh to populate the session state
             else:
-               st.error("Please enter a valid city name.")
+                st.error("Please enter a city name to proceed.")
           
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
