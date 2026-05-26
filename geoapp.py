@@ -207,7 +207,7 @@ with tab2:
                 fetch_weather_data(manual_city)
                 st.rerun()
             else:
-                render_forecast_display()
+               st.error("Please enter a valid city name.")
           
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
