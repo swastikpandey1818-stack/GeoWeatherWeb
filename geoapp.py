@@ -242,19 +242,31 @@ with tab1:
     st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
     m_col1, m_col2, m_col3 = st.columns(3)
     
+    m_col1, m_col2, m_col3 = st.columns(3)
+    
     with m_col1:
-    # This will now display "--" instead of "0°C" if no search has been performed
-    st.markdown(f'''
-        <div class="weather-card" style="text-align: center;">
-            <h2>🌡️</h2>
-            <p style="color:#888;">Temperature</p>
-            <h2>{st.session_state.get("temp_val", "--")}</h2>
-        </div>
-    ''', unsafe_allow_html=True)
+        st.markdown(f'''
+            <div class="weather-card" style="text-align: center;">
+                <h2>🌡️</h2><p style="color:#888;">Temperature</p>
+                <h2>{st.session_state.get("temp_val", "--")}</h2>
+            </div>
+        ''', unsafe_allow_html=True)
+
     with m_col2:
-        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💧</h2><p style="color:#888;">Humidity</p><h2>{st.session_state.get("hum_val", "--")}</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'''
+            <div class="weather-card" style="text-align: center;">
+                <h2>💧</h2><p style="color:#888;">Humidity</p>
+                <h2>{st.session_state.get("hum_val", "--")}</h2>
+            </div>
+        ''', unsafe_allow_html=True)
+
     with m_col3:
-        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💨</h2><p style="color:#888;">Wind Velocity</p><h2>{st.session_state.get("wind_val", "--")}</h2></div>', unsafe_allow_html=True)
+        st.markdown(f'''
+            <div class="weather-card" style="text-align: center;">
+                <h2>💨</h2><p style="color:#888;">Wind Velocity</p>
+                <h2>{st.session_state.get("wind_val", "--")}</h2>
+            </div>
+        ''', unsafe_allow_html=True)
 
     st.markdown('### 🗺️ Geospatial Vector View')
     st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
