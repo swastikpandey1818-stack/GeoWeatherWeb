@@ -6,8 +6,6 @@ import pandas as pd
 import time
 import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
-# Initialize geolocator
-
 
 def get_weather_info(code):
     mapping = {
@@ -36,8 +34,25 @@ def get_weather_info(code):
     return mapping.get(code, ("Unknown", "❓"))
 
 geolocator = Nominatim(user_agent="geoweather_app")
-if "w_data" not in st.session_state:
-    st.session_state.w_data = None
+
+@st.cache_data(ttl=600)
+def cached_geo_search(city_name_query):
+    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name_query}&count=5&language=en&format=json"
+    response = requests.get(geo_url, timeout=15)
+    response.raise_for_status()
+    return response.json()
+@st.cache_data(ttl=600)
+def cached_weather_fetch(lat, lon):
+    weather_url = (
+        f"https://api.open-meteo.com/v1/forecast?latitude={lat}"
+        f"&longitude={lon}&current_weather=true"
+        f"&hourly=temperature_2m,relative_humidity_2m"
+        f"&daily=weathercode,temperature_2m_max,temperature_2m_min"
+        f"&timezone=auto&forecast_days=7"
+    )
+    response = requests.get(weather_url, timeout=15)
+    response.raise_for_status()
+    return response.json()
 
 def init_app_state():
     defaults = {
@@ -58,38 +73,8 @@ def init_app_state():
 
 init_app_state()
 
-
-
-if "temp_val" not in st.session_state:
-    st.session_state.temp_val = "0°C"  # Or your desired default
-
-
-def render_custom_bar_chart():
-    categories = ['Coffee', 'Tea', 'Juice', 'Soft Drink', 'Plant-based']
-    values = [100, 60, 70, 30, 40]
-    
-    fig = go.Figure(data=[go.Bar(
-        x=categories, y=values,
-        marker_color='#E4B062', # Match your specific orange tone
-        marker_line_width=0,
-        width=0.6
-    )])
-    
-    fig.update_layout(
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=False, showticklabels=False),
-        margin=dict(l=0, r=0, t=0, b=0)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-# Page Configuration
 st.set_page_config(page_title="Swastik's GeoWeather Pro", page_icon="🌤️", layout="wide")
 
-# ==========================================
-# 💎 PREMIUM GLOBAL CSS CUSTOMIZATIONS
-# ==========================================
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -104,7 +89,6 @@ st.markdown("""
             background: rgba(0,0,0,0);
         }
         
-        /* Premium Card Containers */
         .weather-card {
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -148,64 +132,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def request_with_retry(url, timeout=15, retries=4, backoff=1):
-    last_exception = None
-    retry_statuses = {429, 500, 502, 503, 504}
-
-    for attempt in range(retries):
-        try:
-            response = requests.get(url, timeout=timeout)
-            if response.status_code in retry_statuses:
-                if attempt == retries - 1:
-                    response.raise_for_status()
-                time.sleep(backoff * (2 ** attempt))
-                continue
-            response.raise_for_status()
-            return response
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
-            last_exception = exc
-            if attempt == retries - 1:
-                raise
-            time.sleep(backoff * (2 ** attempt))
-        except requests.exceptions.HTTPError as exc:
-            if response is not None and response.status_code in retry_statuses and attempt < retries - 1:
-                time.sleep(backoff * (2 ** attempt))
-                continue
-            raise
-    raise last_exception or requests.exceptions.RequestException("Request failed after retries")
-
-@st.cache_data(ttl=600)
-def cached_geo_search(city_name_query):
-    geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name_query}&count=5&language=en&format=json"
-    response = request_with_retry(geo_url)
-    return response.json()
-
-@st.cache_data(ttl=600)
-def cached_weather_fetch(lat, lon):
-    weather_url = (
-        f"https://api.open-meteo.com/v1/forecast?latitude={lat}"
-        f"&longitude={lon}&current_weather=true"
-        f"&hourly=temperature_2m,relative_humidity_2m"
-        f"&daily=weathercode,temperature_2m_max,temperature_2m_min"
-        f"&timezone=auto&forecast_days=7"
-    )
-    response = request_with_retry(weather_url)
-    return response.json()
-
-# Helper function to fetch data and store it cleanly in state memory
 def fetch_weather_data(city_name_query):
     st.session_state.fetch_error = None
-    st.session_state.fetch_error = None
-
-    # Inside fetch_weather_data:
-    if "current_weather" in res_data:
-       w_code = res_data['current_weather']['weathercode']
-       desc, emoji = get_weather_info(w_code)
-       st.session_state.weather_desc = desc
-       st.session_state.weather_emoji = emoji
-    # ... rest of your code
+    
     try:
-        # Using geopy instead of Open-Meteo geocoding
         location = geolocator.geocode(city_name_query)
         if location:
             st.session_state.lat = location.latitude
@@ -217,46 +147,35 @@ def fetch_weather_data(city_name_query):
     except Exception as e:
         st.session_state.fetch_error = f"Geocoding error: {e}"
         return
-    except requests.exceptions.HTTPError as exc:
-        if "429" in str(exc):
-            st.session_state.fetch_error = (
-                "Too many requests to Open-Meteo. Please wait a minute and try again."
-            )
-        else:
-            st.session_state.fetch_error = f"Geocoding failed: {exc}"
-        return
-    except Exception as exc:
-        st.session_state.fetch_error = f"Geocoding failed: {exc}"
-        return
 
     try:
         res_data = cached_weather_fetch(st.session_state.lat, st.session_state.lon)
         st.session_state.w_data = res_data
 
         if "current_weather" in res_data:
+            w_code = res_data['current_weather']['weathercode']
+            desc, emoji = get_weather_info(w_code)
+            st.session_state.weather_desc = desc
+            st.session_state.weather_emoji = emoji
+            
             st.session_state.temp_val = f"{res_data['current_weather']['temperature']}°C"
             st.session_state.wind_val = f"{res_data['current_weather']['windspeed']} km/h"
+            
             if "hourly" in res_data and "relative_humidity_2m" in res_data["hourly"]:
                 st.session_state.hum_val = f"{res_data['hourly']['relative_humidity_2m'][0]}%"
         else:
             st.session_state.fetch_error = "Weather data is unavailable for this location."
+            
     except requests.exceptions.HTTPError as exc:
         if "429" in str(exc):
-            st.session_state.fetch_error = (
-                "Too many requests to Open-Meteo. Please wait a minute and try again."
-            )
+            st.session_state.fetch_error = "Too many requests to Open-Meteo. Please wait a minute and try again."
         else:
             st.session_state.fetch_error = f"Weather fetch failed: {exc}"
     except Exception as exc:
         st.session_state.fetch_error = f"Weather fetch failed: {exc}"
 
-
-# Create the 3-Tab navigation layout
 tab1, tab2, tab3 = st.tabs(["📊 Live Weather Metrics", "🔮 7-Day Extended Forecast", "💬 Ask GeoWeather AI"])
 
-# ==========================================
-# 📊 TAB 1: LIVE WEATHER METRICS & SEARCH
-# ==========================================
 with tab1:
     st.markdown("""
         <div style='text-align: center; padding: 15px 0px;'>
@@ -267,7 +186,6 @@ with tab1:
     
     st.markdown('<div class="weather-card">', unsafe_allow_html=True)
     st.markdown("<h3 style='margin-top:0; font-size:1.2rem; color:#FFD700;'>🔍 Search Regional Conditions</h3>", unsafe_allow_html=True)
-    
     city_input = st.text_input("Enter city name:", value="", placeholder="e.g., Gorakhpur, Delhi, London", label_visibility="collapsed")
     search_button = st.button("Get Live Metrics")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -275,13 +193,14 @@ with tab1:
     if search_button and city_input:
         with st.spinner(f"Fetching data for {city_input}..."):
             fetch_weather_data(city_input)
-            st.rerun() # Refresh to update UI immediately
+            st.rerun()
+            
+    if st.session_state.get("fetch_error"):
+        st.error(st.session_state.fetch_error)
     
-    # Conditional Rendering: Only show if location data exists
     if st.session_state.lat is not None:
         st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
         
-        # Condition Card
         st.markdown(f'''
             <div class="weather-card" style="text-align: center;">
                 <h2>{st.session_state.get("weather_emoji", "❓")}</h2>
@@ -290,73 +209,6 @@ with tab1:
             </div>
         ''', unsafe_allow_html=True)
         
-        # Metrics Columns
-        m_col1, m_col2, m_col3 = st.columns(3)
-        
-        with m_col1:
-            st.markdown(f'''
-                <div class="weather-card" style="text-align: center;">
-                    <h2>🌡️</h2><p style="color:#888;">Temperature</p>
-                    <h2>{st.session_state.get("temp_val", "--")}</h2>
-                </div>
-            ''', unsafe_allow_html=True)
-
-        with m_col2:
-            st.markdown(f'''
-                <div class="weather-card" style="text-align: center;">
-                    <h2>💧</h2><p style="color:#888;">Humidity</p>
-                    <h2>{st.session_state.get("hum_val", "--")}</h2>
-                </div>
-            ''', unsafe_allow_html=True)
-
-        with m_col3:
-            st.markdown(f'''
-                <div class="weather-card" style="text-align: center;">
-                    <h2>💨</h2><p style="color:#888;">Wind Velocity</p>
-                    <h2>{st.session_state.get("wind_val", "--")}</h2>
-                </div>
-            ''', unsafe_allow_html=True)
-
-        st.markdown('### 🗺️ Geospatial Vector View')
-        st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
-    else:
-        st.info("Enter a city above to see live weather metrics.")# ==========================================
-# 📊 TAB 1: LIVE WEATHER METRICS & SEARCH
-# ==========================================
-with tab1:
-    st.markdown("""
-        <div style='text-align: center; padding: 15px 0px;'>
-            <h1 style='font-size: 2.5rem; margin-bottom: 0;'>🚀 <span class='gradient-text'>GeoWeather Pro</span></h1>
-            <p style='color: #888888; font-size: 1rem;'>Enterprise-Grade Atmospheric Tracking Engine</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown('<div class="weather-card">', unsafe_allow_html=True)
-    st.markdown("<h3 style='margin-top:0; font-size:1.2rem; color:#FFD700;'>🔍 Search Regional Conditions</h3>", unsafe_allow_html=True)
-    
-    city_input = st.text_input("Enter city name:", value="", placeholder="e.g., Gorakhpur, Delhi, London", label_visibility="collapsed")
-    search_button = st.button("Get Live Metrics")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    if search_button and city_input:
-        with st.spinner(f"Fetching data for {city_input}..."):
-            fetch_weather_data(city_input)
-            st.rerun() # Refresh to update UI immediately
-    
-    # Conditional Rendering: Only show if location data exists
-    if st.session_state.lat is not None:
-        st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
-        
-        # Condition Card
-        st.markdown(f'''
-            <div class="weather-card" style="text-align: center;">
-                <h2>{st.session_state.get("weather_emoji", "❓")}</h2>
-                <p style="color:#888;">Condition</p>
-                <h3>{st.session_state.get("weather_desc", "N/A")}</h3>
-            </div>
-        ''', unsafe_allow_html=True)
-        
-        # Metrics Columns
         m_col1, m_col2, m_col3 = st.columns(3)
         
         with m_col1:
@@ -387,12 +239,8 @@ with tab1:
         st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
     else:
         st.info("Enter a city above to see live weather metrics.")
-# ==========================================
-# 🔮 TAB 2: PREMIUM FORECAST & INFOGRAPHICS
-# ==========================================
 
 def render_forecast_display():
-    """Renders the creative cards and table if data exists."""
     if st.session_state.w_data is None or "daily" not in st.session_state.w_data:
         st.warning("Forecast data is currently unavailable. Please try searching for the city again.")
         return
@@ -426,20 +274,16 @@ def render_forecast_display():
     })
     st.dataframe(df.set_index("Day"), use_container_width=True)
 
-# Add this function to your script
 def get_owm_forecast(city_name):
     owm_key = st.secrets.get("OPENWEATHER_API_KEY")
     url = f"https://api.openweathermap.org/data/2.5/forecast?q={city_name}&appid={owm_key}&units=metric"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
-        # Filter for 12:00 PM entries to get daily snapshots
         return [item for item in data['list'] if "12:00:00" in item['dt_txt']][:5]
     return None
 
-# Update your tab2 block
 def render_custom_bar_chart(forecast_data):
-    """Renders the minimalist bar chart for temperatures."""
     dates = [d['dt_txt'].split(' ')[0] for d in forecast_data]
     temps = [d['main']['temp'] for d in forecast_data]
     
@@ -459,7 +303,6 @@ def render_custom_bar_chart(forecast_data):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# Update your tab2 block in the script
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 Extended Forecast</h2>", unsafe_allow_html=True)
 
@@ -475,7 +318,6 @@ with tab2:
                 forecast_data = get_owm_forecast(manual_city)
                 
                 if forecast_data:
-                    # 1. Cards
                     cols = st.columns(5)
                     for i, day in enumerate(forecast_data):
                         with cols[i]:
@@ -490,32 +332,24 @@ with tab2:
                                 </div>
                             """, unsafe_allow_html=True)
                     
-                    # 2. Add the custom chart
                     st.subheader("Temperature Trend")
                     render_custom_bar_chart(forecast_data)
                     
-                    # 3. Infographic Table
                     st.subheader("Humidity & Temperature Metrics")
                     table_data = [{"Date": d['dt_txt'], "Temp (°C)": d['main']['temp'], "Humidity (%)": d['main']['humidity']} for d in forecast_data]
                     st.table(pd.DataFrame(table_data))
                 else:
-                  st.error("OpenWeatherMap could not find the city or API key is invalid.")
+                    st.error("OpenWeatherMap could not find the city or API key is invalid.")
 
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.caption("⚡ Powered by Gemini 3.5 Flash")
     st.markdown("---")
 
-    # Initialize chat history
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-
-    # Display history
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    # User Input
     if user_input := st.chat_input("Ask a weather query..."):
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
@@ -524,19 +358,12 @@ with tab3:
         with st.chat_message("assistant"):
             with st.spinner("Analyzing atmospheric data..."):
                 try:
-                    # Configure Gemini 3.5
                     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-                    
-                    # Target the latest stable model
                     model = genai.GenerativeModel('gemini-3.5-flash')
-                    
                     response = model.generate_content(user_input)
                     bot_reply = response.text
-                    
                 except Exception as e:
                     bot_reply = f"🚨 AI Engine Error: {str(e)}"
 
                 st.write(bot_reply)
                 st.session_state.chat_history.append({"role": "assistant", "content": bot_reply})
-
-# Add your existing Tab 1 and Tab 2 logic here...
