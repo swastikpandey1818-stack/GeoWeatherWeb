@@ -42,17 +42,21 @@ if "w_data" not in st.session_state:
 def init_app_state():
     defaults = {
         "w_data": None,
-        "temp_val": "--",       # Changed from "0°C" to indicate no data
+        "temp_val": "--",
         "hum_val": "--",
         "wind_val": "--",
         "display_city": "Please search for a city",
         "lat": None,
         "lon": None,
+        "weather_desc": "N/A",
+        "weather_emoji": "❓",
         "chat_history": []
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
+init_app_state()
 
 
 
