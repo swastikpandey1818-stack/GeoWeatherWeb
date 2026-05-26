@@ -199,43 +199,48 @@ with tab2:
             st.info("Error compiling memory state table matrix.")
     else:
         st.info("🔍 Run a location search inside Tab 1 to populate forecast logs.")
-
 # ==========================================
-# 💬 TAB 3: AI CHAT
+# 💬 TAB 3: AI CHAT ENGINE (ISOLATED LOGIC)
 # ==========================================
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
-    st.caption("⚡ Powered by Gemini Engine")
     st.markdown("---")
 
+    # Initialize memory state
     if "chat_history" not in st.session_state:
-        st.session_state.chat_history = [{"role": "assistant", "content": "Namaste! I am your GeoWeather assistant."}]
+        st.session_state.chat_history = []
 
-    for msg in st.session_state.chat_history:
-        with st.chat_message(msg["role"]): st.write(msg["content"])
+    # Display past logs
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
 
-    clean_temp = st.session_state.temp_val if "Error" not in st.session_state.temp_val else "38°C"
-    system_rules = f"You are 'GeoWeather Pro AI' at {st.session_state.display_city} where it is {clean_temp}. Keep answers brief."
-
+    # Handle Input
     if user_input := st.chat_input("Ask a weather query..."):
         st.session_state.chat_history.append({"role": "user", "content": user_input})
-        with st.chat_message("user"): st.write(user_input)
+        with st.chat_message("user"):
+            st.write(user_input)
 
         with st.chat_message("assistant"):
-            with st.spinner("Processing..."):
+            with st.spinner("Connecting to AI..."):
                 try:
+                    # 1. Try Gemini
                     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
                     model = genai.GenerativeModel('gemini-1.5-flash')
-                    bot_reply = model.generate_content(f"{system_rules}\nQuery: {user_input}").text
-                except Exception:
+                    response = model.generate_content(user_input)
+                    bot_reply = response.text
+                except Exception as e:
+                    # 2. Try OpenAI Fallback
                     try:
                         client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-                        bot_reply = client.chat.completions.create(
+                        resp = client.chat.completions.create(
                             model="gpt-4o-mini",
-                            messages=[{"role": "system", "content": system_rules}, {"role": "user", "content": user_input}]
-                        ).choices[0].message.content
-                    except Exception:
-                        bot_reply = f"🚨 Network busy. Status: Temp={clean_temp}."
+                            messages=[{"role": "user", "content": user_input}]
+                        )
+                        bot_reply = resp.choices[0].message.content
+                    except Exception as fatal_error:
+                        # 3. Print the REAL error here
+                        bot_reply = f"🚨 AI Engine Error: {str(fatal_error)}"
 
                 st.write(bot_reply)
                 st.session_state.chat_history.append({"role": "assistant", "content": bot_reply})
