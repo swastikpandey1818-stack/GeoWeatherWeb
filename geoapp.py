@@ -231,12 +231,13 @@ with tab3:
                     # Pointing to Gemini API Key stored safely inside cloud environment
                     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
                     
-                    # 🚀 FIX: Explicitly use the core model path identifier string
-                    model = genai.GenerativeModel(model_name='models/gemini-1.5-flash')
+                    # 💡 FIX: Use the clean model string format directly
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     
                     response = model.generate_content(f"{system_rules}\nUser Query: {user_input}")
                     bot_reply = response.text.strip()
                 except Exception as e:
+                    bot_reply = f"🚨 System pipeline busy or API key configuration missing. Details: {e}"
                     bot_reply = f"🚨 System pipeline busy or API key configuration missing. Details: {e}"
 
                 st.write(bot_reply)
