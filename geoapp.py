@@ -87,17 +87,31 @@ if "lon" not in st.session_state:
 if "fetch_error" not in st.session_state:
     st.session_state.fetch_error = None
 
-def request_with_retry(url, timeout=10, retries=3, backoff=1):
+def request_with_retry(url, timeout=15, retries=4, backoff=1):
+    last_exception = None
+    retry_statuses = {429, 500, 502, 503, 504}
+
     for attempt in range(retries):
-        response = requests.get(url, timeout=timeout)
-        if response.status_code == 429:
+        try:
+            response = requests.get(url, timeout=timeout)
+            if response.status_code in retry_statuses:
+                if attempt == retries - 1:
+                    response.raise_for_status()
+                time.sleep(backoff * (2 ** attempt))
+                continue
+            response.raise_for_status()
+            return response
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+            last_exception = exc
             if attempt == retries - 1:
-                response.raise_for_status()
+                raise
             time.sleep(backoff * (2 ** attempt))
-            continue
-        response.raise_for_status()
-        return response
-    raise requests.exceptions.HTTPError("429 Too Many Requests")
+        except requests.exceptions.HTTPError as exc:
+            if response is not None and response.status_code in retry_statuses and attempt < retries - 1:
+                time.sleep(backoff * (2 ** attempt))
+                continue
+            raise
+    raise last_exception or requests.exceptions.RequestException("Request failed after retries")
 
 @st.cache_data(ttl=600)
 def cached_geo_search(city_name_query):
@@ -253,24 +267,57 @@ def render_forecast_display():
     })
     st.dataframe(df.set_index("Day"), use_container_width=True)
 
+# Add this function to your script
+def get_owm_forecast(city_name):
+    owm_key = st.secrets.get("OPENWEATHER_API_KEY")
+    url = f"https://api.openweathermap.org/data/2.5/forecast?q={city_name}&appid={owm_key}&units=metric"
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        # Filter for 12:00 PM entries to get daily snapshots
+        return [item for item in data['list'] if "12:00:00" in item['dt_txt']][:5]
+    return None
+
+# Update your tab2 block
 with tab2:
-    st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#FFD700;'>🔮 Extended Forecast</h2>", unsafe_allow_html=True)
 
-    if st.session_state.fetch_error:
-        st.error(st.session_state.fetch_error)
-
+    # Primary Display
     if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
         render_forecast_display()
     else:
-        st.markdown("#### Enter a location to view the forecast:")
-        manual_city = st.text_input("City name:", key="tab2_input")
-        if st.button("Load Forecast", key="tab2_load"):
-            if manual_city:
-                fetch_weather_data(manual_city)
-                st.rerun()
-            else:
-                st.error("Please enter a city name to proceed.")
-          
+        st.warning("Primary forecast data unavailable.")
+        
+        # Secondary Option: OWM Fallback
+        st.markdown("---")
+        st.subheader("Try Secondary Source (OpenWeatherMap)")
+        manual_city = st.text_input("Enter city for OWM fallback:", key="owm_fallback_input")
+        if st.button("Load via OpenWeatherMap", key="owm_load_btn"):
+            with st.spinner("Querying OpenWeatherMap..."):
+                forecast_data = get_owm_forecast(manual_city)
+                
+                if forecast_data:
+                    # 1. Cards
+                    cols = st.columns(5)
+                    for i, day in enumerate(forecast_data):
+                        with cols[i]:
+                            date = day['dt_txt'].split(' ')[0]
+                            temp = day['main']['temp']
+                            icon = day['weather'][0]['icon']
+                            st.markdown(f"""
+                                <div style="text-align:center; padding:10px; background:rgba(255,255,255,0.05); border-radius:10px;">
+                                    <small>{date}</small><br>
+                                    <img src="http://openweathermap.org/img/wn/{icon}@2x.png" width="40"><br>
+                                    <strong>{temp}°C</strong>
+                                </div>
+                            """, unsafe_allow_html=True)
+                    
+                    # 2. Infographic Table
+                    st.subheader("Humidity & Temperature Metrics")
+                    table_data = [{"Date": d['dt_txt'], "Temp (°C)": d['main']['temp'], "Humidity (%)": d['main']['humidity']} for d in forecast_data]
+                    st.table(pd.DataFrame(table_data))
+                else:
+                    st.error("OpenWeatherMap could not find the city or API key is invalid.")
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.caption("⚡ Powered by Gemini 3.5 Flash")
