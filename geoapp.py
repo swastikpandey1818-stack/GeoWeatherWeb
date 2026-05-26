@@ -68,17 +68,24 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Create the 3-Tab top navigation layout
-tab1, tab2, tab3 = st.tabs(["📊 Live Weather Metrics", "🔮 7-Day Extended Forecast", "💬 Ask GeoWeather AI"])
-
-# Initialize default parameters safely
-temp_val, hum_val, wind_val = "38°C", "45%", "14 km/h"
-lat, lon = 26.7588, 83.3697 
-display_city = "Gorakhpur, Uttar Pradesh, India"
-
-# Use session state to persist weather data across tab clicks smoothly
+# Initialize Session States properly so variables persist across tab switches
 if "w_data" not in st.session_state:
     st.session_state.w_data = None
+if "display_city" not in st.session_state:
+    st.session_state.display_city = "Gorakhpur, Uttar Pradesh, India"
+if "temp_val" not in st.session_state:
+    st.session_state.temp_val = "38°C"
+if "hum_val" not in st.session_state:
+    st.session_state.hum_val = "45%"
+if "wind_val" not in st.session_state:
+    st.session_state.wind_val = "14 km/h"
+if "lat" not in st.session_state:
+    st.session_state.lat = 26.7588
+if "lon" not in st.session_state:
+    st.session_state.lon = 83.3697
+
+# Create the 3-Tab top navigation layout
+tab1, tab2, tab3 = st.tabs(["📊 Live Weather Metrics", "🔮 7-Day Extended Forecast", "💬 Ask GeoWeather AI"])
 
 # ==========================================
 # 📊 TAB 1: LIVE WEATHER METRICS & SEARCH
@@ -97,7 +104,8 @@ with tab1:
     search_button = st.button("Get Live Metrics")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    if city_input:
+    # Run API actions ONLY when the button is clicked, then save directly to session state
+    if search_button and city_input:
         try:
             geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_input}&count=5&language=en&format=json"
             geo_res = requests.get(geo_url).json()
@@ -109,56 +117,54 @@ with tab1:
                         target_result = res
                         break
                 
-                lat = target_result["latitude"]
-                lon = target_result["longitude"]
+                st.session_state.lat = target_result["latitude"]
+                st.session_state.lon = target_result["longitude"]
                 city_name = target_result["name"]
                 country = target_result.get("country", "")
                 admin = target_result.get("admin1", "")
-                display_city = f"{city_name}, {admin}, {country}" if admin else f"{city_name}, {country}"
+                st.session_state.display_city = f"{city_name}, {admin}, {country}" if admin else f"{city_name}, {country}"
         except Exception:
             pass
 
         try:
-            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
+            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={st.session_state.lat}&longitude={st.session_state.lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
             st.session_state.w_data = requests.get(weather_url).json()
             
             if "current_weather" in st.session_state.w_data:
-                temp_val = f"{st.session_state.w_data['current_weather']['temperature']}°C"
-                wind_val = f"{st.session_state.w_data['current_weather']['windspeed']} km/h"
+                st.session_state.temp_val = f"{st.session_state.w_data['current_weather']['temperature']}°C"
+                st.session_state.wind_val = f"{st.session_state.w_data['current_weather']['windspeed']} km/h"
                 if "hourly" in st.session_state.w_data:
-                    hum_val = f"{st.session_state.w_data['hourly']['relative_humidity_2m'][0]}%"
+                    st.session_state.hum_val = f"{st.session_state.w_data['hourly']['relative_humidity_2m'][0]}%"
         except Exception:
             pass
 
-        st.markdown(f"### 📍 Current Analysis for **{display_city}**")
-        m_col1, m_col2, m_col3 = st.columns(3)
-        
-        with m_col1:
-            st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>🌡️</h2><p style="color:#888;">Temperature</p><h2>{temp_val}</h2></div>', unsafe_allow_html=True)
-        with m_col2:
-            st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💧</h2><p style="color:#888;">Humidity</p><h2>{hum_val}</h2></div>', unsafe_allow_html=True)
-        with m_col3:
-            st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💨</h2><p style="color:#888;">Wind Velocity</p><h2>{wind_val}</h2></div>', unsafe_allow_html=True)
+    # Always pull formatting layouts from session state memory core
+    st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
+    m_col1, m_col2, m_col3 = st.columns(3)
+    
+    with m_col1:
+        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>🌡️</h2><p style="color:#888;">Temperature</p><h2>{st.session_state.temp_val}</h2></div>', unsafe_allow_html=True)
+    with m_col2:
+        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💧</h2><p style="color:#888;">Humidity</p><h2>{st.session_state.hum_val}</h2></div>', unsafe_allow_html=True)
+    with m_col3:
+        st.markdown(f'<div class="weather-card" style="text-align: center;"><h2>💨</h2><p style="color:#888;">Wind Velocity</p><h2>{st.session_state.wind_val}</h2></div>', unsafe_allow_html=True)
 
-        st.markdown('### 🗺️ Geospatial Vector View')
-        st.map(pd.DataFrame({'lat': [lat], 'lon': [lon]}), zoom=10)
+    st.markdown('### 🗺️ Geospatial Vector View')
+    st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
 
 # ==========================================
-# 🔮 TAB 2: FIXED EMOJI FORECAST TABLES
+# 🔮 TAB 2: STORED FORECAST TABLES (STABLE)
 # ==========================================
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
     st.markdown("---")
     
-    # Check if we have valid daily log markers sitting inside session state memory
     if st.session_state.w_data and "daily" in st.session_state.w_data:
         try:
             daily = st.session_state.w_data["daily"]
             dates = pd.to_datetime(daily["time"])
-            
             forecast_entries = []
             
-            # Map structural weather codes into clean visual emojis
             for i in range(len(dates)):
                 code = daily["weathercode"][i]
                 if code in [0, 1]: emoji = "☀️ Sunny"
@@ -176,18 +182,34 @@ with tab2:
                     "🔻 Min Temp": f"{daily['temperature_2m_min'][i]}°C"
                 })
             
-            # Render into a super clean structured table grid inside a glass container
             st.markdown('<div class="weather-card">', unsafe_allow_html=True)
             st.table(pd.DataFrame(forecast_entries).set_index("📅 Day / Date"))
             st.markdown('</div>', unsafe_allow_html=True)
             
-        except Exception as e:
-            st.info("Searching a new location on Tab 1 will update this data map.")
+        except Exception:
+            st.info("Error compiling memory state table matrix.")
     else:
-        st.info("🔍 Search for a location in the primary dashboard tab to render tracking forecasts.")
+        # If the app just booted up, pull the initial default location forecast layout
+        try:
+            default_url = f"https://api.open-meteo.com/v1/forecast?latitude=26.7588&longitude=83.3697&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto"
+            d_res = requests.get(default_url).json()["daily"]
+            d_dates = pd.to_datetime(d_res["time"])
+            d_entries = []
+            for i in range(len(d_dates)):
+                d_entries.append({
+                    "📅 Day / Date": d_dates[i].strftime('%A (%b %d)'),
+                    "📊 Condition": "☀️ Sunny" if d_res["weathercode"][i] in [0,1] else "🌤️ Variable",
+                    "🔺 Max Temp": f"{d_res['temperature_2m_max'][i]}°C",
+                    "🔻 Min Temp": f"{d_res['temperature_2m_min'][i]}°C"
+                })
+            st.markdown('<div class="weather-card">', unsafe_allow_html=True)
+            st.table(pd.DataFrame(d_entries).set_index("📅 Day / Date"))
+            st.markdown('</div>', unsafe_allow_html=True)
+        except Exception:
+            st.info("🔍 Please re-run the search on Tab 1 to establish the active tracker handshake.")
 
 # ==========================================
-# 💬 TAB 3: AI CHAT WITH AUTOMATIC FALLBACK
+# 💬 TAB 3: AI CHAT WITH STABLE LABELS
 # ==========================================
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
@@ -200,8 +222,8 @@ with tab3:
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"]): st.write(msg["content"])
 
-    clean_temp = temp_val if "Error" not in temp_val else "38°C"
-    system_rules = f"You are 'GeoWeather Pro AI' at {display_city} where it is {clean_temp}. Keep answers brief."
+    clean_temp = st.session_state.temp_val if "Error" not in st.session_state.temp_val else "38°C"
+    system_rules = f"You are 'GeoWeather Pro AI' at {st.session_state.display_city} where it is {clean_temp}. Keep answers brief."
 
     if user_input := st.chat_input("Ask a weather query..."):
         st.session_state.chat_history.append({"role": "user", "content": user_input})
