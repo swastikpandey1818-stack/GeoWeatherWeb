@@ -8,6 +8,8 @@ import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
 # Initialize geolocator
 geolocator = Nominatim(user_agent="geoweather_app")
+if "w_data" not in st.session_state:
+    st.session_state.w_data = None
 def render_custom_bar_chart():
     categories = ['Coffee', 'Tea', 'Juice', 'Soft Drink', 'Plant-based']
     values = [100, 60, 70, 30, 40]
