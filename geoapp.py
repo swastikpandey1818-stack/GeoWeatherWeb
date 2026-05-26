@@ -142,13 +142,45 @@ with tab1:
                 # 🗺️ Embedded OpenStreetMap Dynamic Frame block
                 st.markdown('<div class="weather-card">', unsafe_allow_html=True)
                 st.markdown("<h4 style='margin-top:0; color:#FFD700;'>🗺️ Geospatial Vector View</h4>", unsafe_allow_html=True)
-                map_html = f"""
-                <iframe width="100%" height="350" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" 
-                src="https://www.openstreetmap.org/export/embed.html?bbox={lon-0.1}%2C{lat-0.1}%2C{lon+0.1}%2C{lat+0.1}&amp;layer=mapnik&amp;marker={lat}%2C{lon}">
-                </iframe>
-                """
-                components.html(map_html, height=360)
+                map_html = f"https://www.openstreetmap.org/export/embed.html?bbox={lon-0.1}%2C{lat-0.1}%2C{lon+0.1}%2C{lat+0.1}&amp;layer=mapnik&amp;marker={lat}%2C{lon}"
+                st.iframe(map_html, height=350)
                 st.markdown('</div>', unsafe_allow_html=True)
+                
+                # 🌟 EMOJI VISUAL CARDS GRID WITH CALENDAR DATES INSIDE TAB 1
+                st.markdown("<h3 style='color:#FFD700; margin-top: 25px;'>📅 Weekly Outlook Overview</h3>", unsafe_allow_html=True)
+                
+                daily_raw = response.get("daily", {})
+                date_strings = daily_raw.get("time", [])
+                
+                days_transformed = [datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%a") for d in date_strings]
+                dates_formatted = [datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%b %d") for d in date_strings]
+                max_temps = daily_raw.get("temperature_2m_max", [])
+                min_temps = daily_raw.get("temperature_2m_min", [])
+                avg_humidities = daily_raw.get("relative_humidity_2m_mean", [])
+                
+                day_cols = st.columns(7)
+                for i in range(len(days_transformed)):
+                    if max_temps[i] >= 38:
+                        weather_emoji = "🔥"
+                    elif max_temps[i] >= 30:
+                        weather_emoji = "☀️"
+                    elif avg_humidities[i] >= 75:
+                        weather_emoji = "🌧️"
+                    else:
+                        weather_emoji = "⛅"
+                        
+                    with day_cols[i]:
+                        st.markdown(f"""
+                            <div class="weather-card" style="text-align: center; padding: 15px; border-color: rgba(255, 215, 0, 0.15); margin-bottom: 5px;">
+                                <h4 style="margin: 0 0 2px 0; color: #FFD700; font-size: 1.1rem;">{days_transformed[i]}</h4>
+                                <p style="margin: 0 0 8px 0; font-size: 0.75rem; color: #888888; font-weight: 500;">{dates_formatted[i]}</p>
+                                <p style="font-size: 1.8rem; margin: 8px 0;">{weather_emoji}</p>
+                                <p style="margin: 2px 0; font-size: 0.9rem; font-weight: 600; color: #FFF;">{max_temps[i]}°C</p>
+                                <p style="margin: 2px 0; font-size: 0.8rem; color: #888;">{min_temps[i]}°C</p>
+                                <hr style="margin: 8px 0; border-color: rgba(255,255,255,0.05);">
+                                <p style="margin: 0; font-size: 0.75rem; color: #00E5FF;">💧 {int(avg_humidities[i])}%</p>
+                            </div>
+                        """, unsafe_allow_html=True)
                 
                 # Store coordinates inside execution state cache for Tab 2 reference maps
                 st.session_state['last_weather_data'] = response
@@ -172,39 +204,77 @@ with tab2:
         
         # Parse arrays dynamically from API timeline indices
         date_strings = daily_raw.get("time", [])
+        
+        # Create clean day names (e.g., "Tue") AND formatted dates (e.g., "May 26")
         days_transformed = [datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%a") for d in date_strings]
+        dates_formatted = [datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%b %d") for d in date_strings]
         
-        forecast_df = pd.DataFrame({
-            "Day": days_transformed,
-            "Max Temp (°C)": daily_raw.get("temperature_2m_max", []),
-            "Min Temp (°C)": daily_raw.get("temperature_2m_min", []),
-            "Avg Humidity (%)": daily_raw.get("relative_humidity_2m_mean", [])
-        })
+        max_temps = daily_raw.get("temperature_2m_max", [])
+        min_temps = daily_raw.get("temperature_2m_min", [])
+        avg_humidities = daily_raw.get("relative_humidity_2m_mean", [])
         
-        col1, col2 = st.columns(2)
-        with col1:
+        # 📊 1. Core Visual Analytics (Charts side-by-side)
+        col_chart1, col_chart2 = st.columns(2)
+        with col_chart1:
             st.markdown('<div class="weather-card">', unsafe_allow_html=True)
             st.subheader("📋 Core Temperature Bounds")
-            st.line_chart(forecast_df.set_index("Day")[["Max Temp (°C)", "Min Temp (°C)"]])
-            st.markdown('</div>', unsafe_allow_html=True)
-        with col2:
-            st.markdown('<div class="weather-card">', unsafe_allow_html=True)
-            st.subheader("💧 Humidity Percentage Projections")
-            st.bar_chart(forecast_df.set_index("Day")["Avg Humidity (%)"])
+            
+            # Temporary DataFrame built strictly for the graph engine plotting lines
+            forecast_df = pd.DataFrame({
+                "Day": days_transformed,
+                "Max Temp (°C)": max_temps,
+                "Min Temp (°C)": min_temps
+            })
+            st.line_chart(forecast_df.set_index("Day"))
             st.markdown('</div>', unsafe_allow_html=True)
             
-        # Display raw data table view below metrics
-        with st.expander("👁️ View Full Spreadsheet Forecast Matrices"):
-            st.dataframe(forecast_df, use_container_width=True)
+        with col_chart2:
+            st.markdown('<div class="weather-card">', unsafe_allow_html=True)
+            st.subheader("💧 Humidity Percentage Projections")
+            humidity_df = pd.DataFrame({
+                "Day": days_transformed,
+                "Avg Humidity (%)": avg_humidities
+            })
+            st.bar_chart(humidity_df.set_index("Day"))
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        # 🌟 2. PREMIUM VISUAL CARDS GRID WITH CALENDAR DATES INSIDE TAB 2
+        st.markdown("<h3 style='color:#FFD700; margin-top: 20px;'>📅 Weekly Outlook Overview</h3>", unsafe_allow_html=True)
+        
+        # Build 7 fluid columns side-by-side (one for each day)
+        day_cols = st.columns(7)
+        
+        for i in range(len(days_transformed)):
+            if max_temps[i] >= 38:
+                weather_emoji = "🔥"
+            elif max_temps[i] >= 30:
+                weather_emoji = "☀️"
+            elif avg_humidities[i] >= 75:
+                weather_emoji = "🌧️"
+            else:
+                weather_emoji = "⛅"
+                
+            with day_cols[i]:
+                st.markdown(f"""
+                    <div class="weather-card" style="text-align: center; padding: 15px; border-color: rgba(255, 215, 0, 0.15); margin-bottom: 5px;">
+                        <h4 style="margin: 0 0 2px 0; color: #FFD700; font-size: 1.1rem;">{days_transformed[i]}</h4>
+                        <p style="margin: 0 0 8px 0; font-size: 0.75rem; color: #888888; font-weight: 500;">{dates_formatted[i]}</p>
+                        <p style="font-size: 1.8rem; margin: 8px 0;">{weather_emoji}</p>
+                        <p style="margin: 2px 0; font-size: 0.9rem; font-weight: 600; color: #FFF;">{max_temps[i]}°C</p>
+                        <p style="margin: 2px 0; font-size: 0.8rem; color: #888;">{min_temps[i]}°C</p>
+                        <hr style="margin: 8px 0; border-color: rgba(255,255,255,0.05);">
+                        <p style="margin: 0; font-size: 0.75rem; color: #00E5FF;">💧 {int(avg_humidities[i])}%</p>
+                    </div>
+                """, unsafe_allow_html=True)
     else:
         st.info("ℹ️ Please enter and process a location query inside Tab 1 first to load extended charts.")
 
 # ==========================================
-# 💬 TAB 3: AI CHAT (STABLE HTTP REQUESTS)
+# 💬 TAB 3: AI CHAT (STABLE ENDPOINT GATEWAY)
 # ==========================================
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
-    st.caption("⚡ Powered by Gemini Engine (Stable API Access Node)")
+    st.caption("⚡ Powered by Gemini Engine")
     st.markdown("---")
 
     if "chat_history" not in st.session_state:
@@ -227,13 +297,12 @@ with tab3:
             with st.spinner("Processing atmospheric cloud queries..."):
                 bot_reply = ""
                 try:
-                    # Fetching the private key safely from your dashboard secrets vault
+                    # Pull API token seamlessly from local secrets.toml config file or cloud vault
                     api_key = st.secrets["GOOGLE_API_KEY"]
                     
-                    # Direct standard HTTP REST URL for the stable production endpoint
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+                    # PRODUCTION STANDARD URL: Directly pointing to the active gemini-2.5-flash endpoint
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
                     
-                    # Formulate direct payload block mapping parameters cleanly
                     payload = {
                         "contents": [{
                             "parts": [{
@@ -242,7 +311,6 @@ with tab3:
                         }]
                     }
                     
-                    # Fire standard request payload straight over the internet tunnel
                     res = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
                     
                     if res.status_code == 200:
