@@ -68,7 +68,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Session States properly so variables persist across tab switches
+# Initialize Session States
 if "w_data" not in st.session_state:
     st.session_state.w_data = None
 if "display_city" not in st.session_state:
@@ -84,7 +84,48 @@ if "lat" not in st.session_state:
 if "lon" not in st.session_state:
     st.session_state.lon = 83.3697
 
-# Create the 3-Tab top navigation layout
+# Helper function to fetch data and store it cleanly in state memory
+def fetch_weather_data(city_name_query):
+    try:
+        # Geocoding
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name_query}&count=5&language=en&format=json"
+        geo_res = requests.get(geo_url).json()
+        
+        if "results" in geo_res and len(geo_res["results"]) > 0:
+            target_result = geo_res["results"][0]
+            for res in geo_res["results"]:
+                if res.get("admin1") == "Uttar Pradesh":
+                    target_result = res
+                    break
+            
+            st.session_state.lat = target_result["latitude"]
+            st.session_state.lon = target_result["longitude"]
+            c_name = target_result["name"]
+            country = target_result.get("country", "")
+            admin = target_result.get("admin1", "")
+            st.session_state.display_city = f"{c_name}, {admin}, {country}" if admin else f"{c_name}, {country}"
+    except Exception:
+        pass
+
+    try:
+        # Core Weather API call
+        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={st.session_state.lat}&longitude={st.session_state.lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
+        res_data = requests.get(weather_url).json()
+        st.session_state.w_data = res_data
+        
+        if "current_weather" in res_data:
+            st.session_state.temp_val = f"{res_data['current_weather']['temperature']}°C"
+            st.session_state.wind_val = f"{res_data['current_weather']['windspeed']} km/h"
+            if "hourly" in res_data:
+                st.session_state.hum_val = f"{res_data['hourly']['relative_humidity_2m'][0]}%"
+    except Exception:
+        pass
+
+# Bootstrapping: If the app just opened up, run an initial background fetch for Gorakhpur right away
+if st.session_state.w_data is None:
+    fetch_weather_data("Gorakhpur")
+
+# Create the 3-Tab navigation layout
 tab1, tab2, tab3 = st.tabs(["📊 Live Weather Metrics", "🔮 7-Day Extended Forecast", "💬 Ask GeoWeather AI"])
 
 # ==========================================
@@ -104,41 +145,9 @@ with tab1:
     search_button = st.button("Get Live Metrics")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Run API actions ONLY when the button is clicked, then save directly to session state
     if search_button and city_input:
-        try:
-            geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_input}&count=5&language=en&format=json"
-            geo_res = requests.get(geo_url).json()
-            
-            if "results" in geo_res and len(geo_res["results"]) > 0:
-                target_result = geo_res["results"][0]
-                for res in geo_res["results"]:
-                    if res.get("admin1") == "Uttar Pradesh":
-                        target_result = res
-                        break
-                
-                st.session_state.lat = target_result["latitude"]
-                st.session_state.lon = target_result["longitude"]
-                city_name = target_result["name"]
-                country = target_result.get("country", "")
-                admin = target_result.get("admin1", "")
-                st.session_state.display_city = f"{city_name}, {admin}, {country}" if admin else f"{city_name}, {country}"
-        except Exception:
-            pass
+        fetch_weather_data(city_input)
 
-        try:
-            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={st.session_state.lat}&longitude={st.session_state.lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
-            st.session_state.w_data = requests.get(weather_url).json()
-            
-            if "current_weather" in st.session_state.w_data:
-                st.session_state.temp_val = f"{st.session_state.w_data['current_weather']['temperature']}°C"
-                st.session_state.wind_val = f"{st.session_state.w_data['current_weather']['windspeed']} km/h"
-                if "hourly" in st.session_state.w_data:
-                    st.session_state.hum_val = f"{st.session_state.w_data['hourly']['relative_humidity_2m'][0]}%"
-        except Exception:
-            pass
-
-    # Always pull formatting layouts from session state memory core
     st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
     m_col1, m_col2, m_col3 = st.columns(3)
     
@@ -153,7 +162,7 @@ with tab1:
     st.map(pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon]}), zoom=10)
 
 # ==========================================
-# 🔮 TAB 2: STORED FORECAST TABLES (STABLE)
+# 🔮 TAB 2: 7-DAY FORECAST WITH EMOJIS
 # ==========================================
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
@@ -189,27 +198,10 @@ with tab2:
         except Exception:
             st.info("Error compiling memory state table matrix.")
     else:
-        # If the app just booted up, pull the initial default location forecast layout
-        try:
-            default_url = f"https://api.open-meteo.com/v1/forecast?latitude=26.7588&longitude=83.3697&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto"
-            d_res = requests.get(default_url).json()["daily"]
-            d_dates = pd.to_datetime(d_res["time"])
-            d_entries = []
-            for i in range(len(d_dates)):
-                d_entries.append({
-                    "📅 Day / Date": d_dates[i].strftime('%A (%b %d)'),
-                    "📊 Condition": "☀️ Sunny" if d_res["weathercode"][i] in [0,1] else "🌤️ Variable",
-                    "🔺 Max Temp": f"{d_res['temperature_2m_max'][i]}°C",
-                    "🔻 Min Temp": f"{d_res['temperature_2m_min'][i]}°C"
-                })
-            st.markdown('<div class="weather-card">', unsafe_allow_html=True)
-            st.table(pd.DataFrame(d_entries).set_index("📅 Day / Date"))
-            st.markdown('</div>', unsafe_allow_html=True)
-        except Exception:
-            st.info("🔍 Please re-run the search on Tab 1 to establish the active tracker handshake.")
+        st.info("🔍 Run a location search inside Tab 1 to populate forecast logs.")
 
 # ==========================================
-# 💬 TAB 3: AI CHAT WITH STABLE LABELS
+# 💬 TAB 3: AI CHAT
 # ==========================================
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
