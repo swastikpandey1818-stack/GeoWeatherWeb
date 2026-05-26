@@ -169,6 +169,8 @@ with tab1:
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
     st.markdown("---")
+    # Force an initial fetch if it's the very first time the app is opened
+    # This forces the app to refresh and populate the data immediately
     if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
         try:
             daily = st.session_state.w_data["daily"]
@@ -202,7 +204,10 @@ with tab2:
             st.error(f"Technical Data Error: {e}")
             st.write("Raw data sample:", st.session_state.w_data.keys())
     else:
-        st.info("🔍 Loading weather data... please ensure a location is selected.")
+        if st.session_state.w_data is None:
+               fetch_weather_data("Gorakhpur")
+               st.rerun()
+        st.info("🔍 Loading weather data... please ensure a location is selected.,default Gorakhpur")
 
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
