@@ -169,8 +169,7 @@ with tab1:
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
     st.markdown("---")
-    if "current_city" in st.session_state and st.session_state.current_city:
-        st.write(f"Showing forecast for: **{st.session_state.current_city}**")
+    if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
         try:
             daily = st.session_state.w_data["daily"]
             dates = pd.to_datetime(daily["time"])
@@ -178,6 +177,7 @@ with tab2:
             
             for i in range(len(dates)):
                 code = daily["weathercode"][i]
+                # ... (Keep your existing emoji logic)
                 if code in [0, 1]: emoji = "☀️ Sunny"
                 elif code in [2, 3]: emoji = "☁️ Partly Cloudy"
                 elif code in [45, 48]: emoji = "🌫️ Foggy"
@@ -197,10 +197,12 @@ with tab2:
             st.table(pd.DataFrame(forecast_entries).set_index("📅 Day / Date"))
             st.markdown('</div>', unsafe_allow_html=True)
             
-        except Exception:
-            st.info("Error compiling memory state table matrix.")
+        except Exception as e:
+            # 2. Print the REAL error instead of the custom message
+            st.error(f"Technical Data Error: {e}")
+            st.write("Raw data sample:", st.session_state.w_data.keys())
     else:
-        st.info("🔍 Run a location search inside Tab 1 to populate forecast logs.")
+        st.info("🔍 Loading weather data... please ensure a location is selected.")
 
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
