@@ -1,6 +1,5 @@
 geopy
-pandas
-openai
+
 streamlit
 google-generativeai
 requests
