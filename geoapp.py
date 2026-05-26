@@ -145,7 +145,9 @@ with tab1:
     search_button = st.button("Get Live Metrics")
     st.markdown('</div>', unsafe_allow_html=True)
     
+    
     if search_button and city_input:
+        st.session_state.current_city = city_input
         fetch_weather_data(city_input)
 
     st.markdown(f"### 📍 Current Analysis for **{st.session_state.display_city}**")
@@ -167,8 +169,8 @@ with tab1:
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 7-Day Regional Extended Forecast</h2>", unsafe_allow_html=True)
     st.markdown("---")
-    
-    if st.session_state.w_data and "daily" in st.session_state.w_data:
+    if "current_city" in st.session_state and st.session_state.current_city:
+        st.write(f"Showing forecast for: **{st.session_state.current_city}**")
         try:
             daily = st.session_state.w_data["daily"]
             dates = pd.to_datetime(daily["time"])
@@ -199,7 +201,7 @@ with tab2:
             st.info("Error compiling memory state table matrix.")
     else:
         st.info("🔍 Run a location search inside Tab 1 to populate forecast logs.")
-        
+
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.caption("⚡ Powered by Gemini 3.5 Flash")
