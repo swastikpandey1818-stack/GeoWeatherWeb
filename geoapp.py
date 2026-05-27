@@ -343,9 +343,20 @@ with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.caption("⚡ Powered by Gemini 3.5 Flash")
     st.markdown("---")
-    st.chat_message("Namaste! I'm your GeoWeather AI assistant. Ask me anything about the weather, forecasts, or atmospheric conditions in any city around the world! 🌍☁️")
+    if "chat_history" not in st.session_state:
+      st.session_state.chat_history = [
+        {
+            "role": "assistant", 
+            "content": "Namaste! I'm your GeoWeather AI assistant. Ask me anything about the weather, forecasts, or atmospheric conditions in any city around the world! 🌍☁️"
+        }
+    ]
+
+# 2. Loop through the list and render each message correctly
+      for message in st.session_state.chat_history:
+         with st.chat_message(message["role"]):
+           st.write(message["content"])
     for message in st.session_state.chat_history:
-        with st.chat_message(message["role"]):
+         with st.chat_message(message["role"]):
             st.write(message["content"])
 
     if user_input := st.chat_input("Ask a weather query..."):
