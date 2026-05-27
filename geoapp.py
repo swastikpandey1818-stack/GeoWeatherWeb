@@ -4,6 +4,7 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
+import pydeck as pdk
 
 def get_weather_info(code):
     mapping = {
@@ -242,7 +243,7 @@ def render_forecast_display():
     if st.session_state.w_data is None or "daily" not in st.session_state.w_data:
         st.warning("Forecast data is currently unavailable. Please try searching for the city again.")
         return
-
+    
     daily = st.session_state.w_data["daily"]
     if not daily.get("time") or not daily.get("temperature_2m_max"):
         st.warning("Incomplete forecast data received from the API.")
@@ -271,6 +272,7 @@ def render_forecast_display():
         "Min (°C)": daily["temperature_2m_min"]
     })
     st.dataframe(df.set_index("Day"), use_container_width=True)
+
 
 def get_owm_forecast(city_name):
     owm_key = st.secrets.get("OPENWEATHER_API_KEY")
@@ -303,9 +305,29 @@ def render_custom_bar_chart(forecast_data):
 
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 Extended Forecast</h2>", unsafe_allow_html=True)
-
     if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
         render_forecast_display()
+        
+        st.markdown("---")
+        st.subheader("🗺️ Advanced Atmospheric Wind Flow")
+        
+        # This map code now sits cleanly under the forecast display
+        map_data = pd.DataFrame({
+            'lat': [st.session_state.lat or 28.61],
+            'lon': [st.session_state.lon or 77.20]
+        })
+
+        st.pydeck_chart(pdk.Deck(
+            initial_view_state=pdk.ViewState(
+                latitude=st.session_state.lat or 28.61,
+                longitude=st.session_state.lon or 77.20,
+                zoom=5,
+                pitch=45,
+            ),
+            layers=[pdk.Layer("ScatterplotLayer", map_data, get_position="[lon, lat]", get_radius=20000, get_color=[255, 215, 0, 160])],
+        ))
+    else:
+        # Fallback logic...
     else:
         st.warning("Primary forecast data unavailable.")
         st.markdown("---")
@@ -337,7 +359,8 @@ with tab2:
                     table_data = [{"Date": d['dt_txt'], "Temp (°C)": d['main']['temp'], "Humidity (%)": d['main']['humidity']} for d in forecast_data]
                     st.table(pd.DataFrame(table_data))
                 else:
-                    st.error("OpenWeatherMap could not find the city or API key is invalid.")
+                  st.error("OpenWeatherMap could not find the city or API key is invalid.")
+            
 
 with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
@@ -355,9 +378,6 @@ with tab3:
       for message in st.session_state.chat_history:
          with st.chat_message(message["role"]):
            st.write(message["content"])
-    for message in st.session_state.chat_history:
-         with st.chat_message(message["role"]):
-            st.write(message["content"])
 
     if user_input := st.chat_input("Ask a weather query..."):
         st.session_state.chat_history.append({"role": "user", "content": user_input})
