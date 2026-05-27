@@ -325,23 +325,25 @@ with tab2:
             initial_view_state=pdk.ViewState(
                 latitude=st.session_state.lat, longitude=st.session_state.lon, zoom=9, pitch=0,
             ),
-            layers=[
+           
                 # Heatmap Layer
+            layers=[
+                # 1. Heatmap Layer (Keep it simple)
                 pdk.Layer(
                     "HeatmapLayer",
-                    heat_data,
+                    data=heat_data,
                     get_position="[lon, lat]",
                     get_weight="temp",
-                    aggregation=pdk.types.String("MEAN"),
                 ),
                 # Wind Arrow Icon Layer
                 pdk.Layer(
                     "IconLayer",
-                    arrow_data,
+                    data=arrow_data,
                     get_position="[lon, lat]",
-                    get_icon="{url: 'https://cdn-icons-png.flaticon.com/512/3106/3106773.png', width: 128, height: 128}",
+                    # Use a simple URL string directly
+                    get_icon="{'url': 'https://img.icons8.com/ios-filled/50/ffffff/long-arrow-up.png', 'width': 50, 'height': 50, 'anchorY': 25}",
                     get_size=50,
-                    get_angle="angle", # This rotates the arrow based on wind direction!
+                    get_angle="angle", 
                     pickable=True,
                 )
             ],
