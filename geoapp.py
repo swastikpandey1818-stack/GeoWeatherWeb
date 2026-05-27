@@ -308,36 +308,43 @@ with tab2:
     if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
         render_forecast_display()
         
-        wind_speed = st.session_state.w_data["hourly"]["wind_speed_10m"][0]
+        # 1. Prepare Data
+        # Get wind data (using current index [0])
+        wind_spd = st.session_state.w_data["hourly"]["wind_speed_10m"][0]
         wind_dir = st.session_state.w_data["hourly"]["wind_direction_10m"][0]
+        # Get temperature for heatmap (using current index [0])
+        temp_val = st.session_state.w_data["hourly"]["temperature_2m"][0]
         
-        # Calculate endpoint (basic trigonometry)
-        import math
-        rad = math.radians(wind_dir)
-        # 0.5 is the length of the arrow arc
-        target_lat = st.session_state.lat + (0.5 * math.cos(rad))
-        target_lon = st.session_state.lon + (0.5 * math.sin(rad))
-
-        map_data = pd.DataFrame({
-            'source_lat': [st.session_state.lat],
-            'source_lon': [st.session_state.lon],
-            'target_lat': [target_lat],
-            'target_lon': [target_lon]
-        })
+        # 2. Map DataFrames
+        # For Heatmap
+        heat_data = pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon], 'temp': [temp_val]})
+        # For Arrow (simplified)
+        arrow_data = pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon], 'angle': [wind_dir]})
 
         st.pydeck_chart(pdk.Deck(
             initial_view_state=pdk.ViewState(
-                latitude=st.session_state.lat, longitude=st.session_state.lon, zoom=7, pitch=45,
+                latitude=st.session_state.lat, longitude=st.session_state.lon, zoom=9, pitch=0,
             ),
-            layers=[pdk.Layer(
-                "ArcLayer",
-                map_data,
-                get_source_position="[source_lon, source_lat]",
-                get_target_position="[target_lon, target_lat]",
-                get_source_color=[255, 215, 0, 160],
-                get_target_color=[255, 0, 0, 160],
-                get_width=5,
-            )],
+            layers=[
+                # Heatmap Layer
+                pdk.Layer(
+                    "HeatmapLayer",
+                    heat_data,
+                    get_position="[lon, lat]",
+                    get_weight="temp",
+                    aggregation=pdk.types.String("MEAN"),
+                ),
+                # Wind Arrow Icon Layer
+                pdk.Layer(
+                    "IconLayer",
+                    arrow_data,
+                    get_position="[lon, lat]",
+                    get_icon="{url: 'https://cdn-icons-png.flaticon.com/512/3106/3106773.png', width: 128, height: 128}",
+                    get_size=50,
+                    get_angle="angle", # This rotates the arrow based on wind direction!
+                    pickable=True,
+                )
+            ],
         ))
         
     else:
