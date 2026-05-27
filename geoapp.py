@@ -1,9 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
-import openai
 import requests
 import pandas as pd
-import time
 import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
 
