@@ -45,7 +45,7 @@ def cached_weather_fetch(lat, lon):
     weather_url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}"
         f"&longitude={lon}&current_weather=true"
-        f"&hourly=temperature_2m,relative_humidity_2m"
+        f"&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m"
         f"&daily=weathercode,temperature_2m_max,temperature_2m_min"
         f"&timezone=auto&forecast_days=7"
     )
@@ -308,24 +308,38 @@ with tab2:
     if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
         render_forecast_display()
         
-        st.markdown("---")
-        st.subheader("🗺️ Advanced Atmospheric Wind Flow")
+        wind_speed = st.session_state.w_data["hourly"]["wind_speed_10m"][0]
+        wind_dir = st.session_state.w_data["hourly"]["wind_direction_10m"][0]
         
-        # This map code now sits cleanly under the forecast display
+        # Calculate endpoint (basic trigonometry)
+        import math
+        rad = math.radians(wind_dir)
+        # 0.5 is the length of the arrow arc
+        target_lat = st.session_state.lat + (0.5 * math.cos(rad))
+        target_lon = st.session_state.lon + (0.5 * math.sin(rad))
+
         map_data = pd.DataFrame({
-            'lat': [st.session_state.lat or 28.61],
-            'lon': [st.session_state.lon or 77.20]
+            'source_lat': [st.session_state.lat],
+            'source_lon': [st.session_state.lon],
+            'target_lat': [target_lat],
+            'target_lon': [target_lon]
         })
 
         st.pydeck_chart(pdk.Deck(
             initial_view_state=pdk.ViewState(
-                latitude=st.session_state.lat or 28.61,
-                longitude=st.session_state.lon or 77.20,
-                zoom=5,
-                pitch=45,
+                latitude=st.session_state.lat, longitude=st.session_state.lon, zoom=7, pitch=45,
             ),
-            layers=[pdk.Layer("ScatterplotLayer", map_data, get_position="[lon, lat]", get_radius=20000, get_color=[255, 215, 0, 160])],
+            layers=[pdk.Layer(
+                "ArcLayer",
+                map_data,
+                get_source_position="[source_lon, source_lat]",
+                get_target_position="[target_lon, target_lat]",
+                get_source_color=[255, 215, 0, 160],
+                get_target_color=[255, 0, 0, 160],
+                get_width=5,
+            )],
         ))
+        
     else:
         # Fallback logic...
         st.warning("Primary forecast data unavailable.")
