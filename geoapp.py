@@ -306,47 +306,39 @@ def render_custom_bar_chart(forecast_data):
 with tab2:
     st.markdown("<h2 style='color:#FFD700;'>🔮 Extended Forecast</h2>", unsafe_allow_html=True)
     if st.session_state.w_data is not None and "daily" in st.session_state.w_data:
-        render_forecast_display()
-        
-        # 1. Prepare Data
-        # Get wind data (using current index [0])
-        wind_spd = st.session_state.w_data["hourly"]["wind_speed_10m"][0]
+        render_forecast_display(
+        )
+        # Get the latest wind data from the hourly list
+        wind_speed = st.session_state.w_data["hourly"]["wind_speed_10m"][0]
         wind_dir = st.session_state.w_data["hourly"]["wind_direction_10m"][0]
-        # Get temperature for heatmap (using current index [0])
-        temp_val = st.session_state.w_data["hourly"]["temperature_2m"][0]
         
-        # 2. Map DataFrames
-        # For Heatmap
-        heat_data = pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon], 'temp': [temp_val]})
-        # For Arrow (simplified)
-        arrow_data = pd.DataFrame({'lat': [st.session_state.lat], 'lon': [st.session_state.lon], 'angle': [wind_dir]})
+        # Calculate endpoint (basic trigonometry)
+        import math
+        rad = math.radians(wind_dir)
+        # 0.5 is the length of the arrow arc
+        target_lat = st.session_state.lat + (0.5 * math.cos(rad))
+        target_lon = st.session_state.lon + (0.5 * math.sin(rad))
+
+        map_data = pd.DataFrame({
+            'source_lat': [st.session_state.lat],
+            'source_lon': [st.session_state.lon],
+            'target_lat': [target_lat],
+            'target_lon': [target_lon]
+        })
 
         st.pydeck_chart(pdk.Deck(
             initial_view_state=pdk.ViewState(
-                latitude=st.session_state.lat, longitude=st.session_state.lon, zoom=9, pitch=0,
+                latitude=st.session_state.lat, longitude=st.session_state.lon, zoom=7, pitch=45,
             ),
-           
-                # Heatmap Layer
-            layers=[
-                # 1. Heatmap Layer (Keep it simple)
-                pdk.Layer(
-                    "HeatmapLayer",
-                    data=heat_data,
-                    get_position="[lon, lat]",
-                    get_weight="temp",
-                ),
-                # Wind Arrow Icon Layer
-                pdk.Layer(
-                    "IconLayer",
-                    data=arrow_data,
-                    get_position="[lon, lat]",
-                    # Use a simple URL string directly
-                    get_icon="{'url': 'https://img.icons8.com/ios-filled/50/ffffff/long-arrow-up.png', 'width': 50, 'height': 50, 'anchorY': 25}",
-                    get_size=50,
-                    get_angle="angle", 
-                    pickable=True,
-                )
-            ],
+            layers=[pdk.Layer(
+                "ArcLayer",
+                map_data,
+                get_source_position="[source_lon, source_lat]",
+                get_target_position="[target_lon, target_lat]",
+                get_source_color=[255, 215, 0, 160],
+                get_target_color=[255, 0, 0, 160],
+                get_width=5,
+            )],
         ))
         
     else:
