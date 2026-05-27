@@ -343,7 +343,7 @@ with tab3:
     st.markdown("<h2 style='color:#FFD700;'>💬 GeoWeather AI Assistant</h2>", unsafe_allow_html=True)
     st.caption("⚡ Powered by Gemini 3.5 Flash")
     st.markdown("---")
-
+    st.chat_message("Namaste! I'm your GeoWeather AI assistant. Ask me anything about the weather, forecasts, or atmospheric conditions in any city around the world! 🌍☁️")
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.write(message["content"])
