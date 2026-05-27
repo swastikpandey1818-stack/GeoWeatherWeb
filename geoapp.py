@@ -328,7 +328,6 @@ with tab2:
         ))
     else:
         # Fallback logic...
-    else:
         st.warning("Primary forecast data unavailable.")
         st.markdown("---")
         st.subheader("Try Secondary Source (OpenWeatherMap)")
